@@ -1,0 +1,30 @@
+.DS_Store
+
+# Local build caches and downloaded toolchains
+work/clang-cache/
+work/swift-module-cache/
+work/toolchain/
+
+# Historical local binaries and ad-hoc test artifacts
+work/MochiMD-*
+work/MochiMD-test
+work/MochiMD-next
+work/MochiMD-0.2
+work/extract_document_icon
+work/extract_document_icon.m
+work/make_macos_icon
+work/make_macos_icon.m
+work/mochi-doc-v038.iconset/
+work/mochi-pixel.iconset/
+work/mochi-icon-pixel-original.png
+work/mochi-md-desktop/
+work/mochi-md-native/MochiMD-*
+work/mochi-md-native/MochiMD.swift
+work/mochi-md-native/Info-QA.plist
+work/rustup-init
+work/*.md
+
+# Generated application bundles and release archives
+outputs/Mochi MD.app/
+outputs/*.zip
+dist/

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="lavender">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Mochi MD</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <main class="app-shell">
+      <header class="titlebar" data-tauri-drag-region>
+        <div class="traffic-lights" aria-hidden="true">
+          <span class="red"></span><span class="yellow"></span><span class="green"></span>
+        </div>
+        <div class="brand"><span class="brand-mark">m</span><span>Mochi MD</span></div>
+        <div class="save-state" id="saveState"><span></span> 已保存</div>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar" id="sidebar">
+          <div class="sidebar-top">
+            <div class="profile">
+              <button class="avatar" id="avatarButton" aria-label="更换自定义头像" title="更换头像">
+                <span id="avatarFallback">＋</span>
+                <img id="avatarImage" alt="自定义头像" hidden />
+                <span class="avatar-edit">更换</span>
+              </button>
+              <button class="profile-copy" id="profileCopy" aria-label="自定义书桌名称与描述" aria-expanded="false" aria-controls="profilePopover" title="自定义文字">
+                <span><strong id="deskName">我的小书桌</strong><small id="deskSubtitle">只属于你的文字空间</small></span>
+                <i>✎</i>
+              </button>
+            </div>
+            <button class="icon-button mobile-close" id="closeSidebar" aria-label="关闭侧栏">×</button>
+          </div>
+
+          <div class="profile-popover" id="profilePopover" hidden>
+            <div class="profile-popover-title"><strong>我的文字空间</strong><button id="resetProfileText">恢复默认</button></div>
+            <label>书桌名称<input id="deskNameInput" maxlength="16" autocomplete="off" /></label>
+            <label>一句小介绍<input id="deskSubtitleInput" maxlength="28" autocomplete="off" /></label>
+            <div class="profile-popover-actions"><button id="cancelProfileText">取消</button><button class="primary" id="saveProfileText">保存</button></div>
+          </div>
+
+          <button class="new-button" id="newDoc"><span>＋</span> 新建文档 <kbd>⌘ N</kbd></button>
+
+          <nav class="nav-list" aria-label="文档分类">
+            <button class="nav-item active" id="allDocuments" data-document-filter="all"><span>◫</span>全部文档 <em id="docCount">3</em></button>
+            <button class="nav-item" id="favoriteDocuments" data-document-filter="favorites"><span>♡</span>我的收藏 <em id="favoriteCount">0</em></button>
+            <button class="nav-item" id="openFile"><span>↗</span>打开本地文件</button>
+          </nav>
+
+          <div class="section-title">
+            <span id="documentListTitle">最近编辑</span>
+            <button id="recentMenuButton" aria-label="整理最近编辑" aria-expanded="false" aria-controls="recentMenu">•••</button>
+            <div class="recent-menu" id="recentMenu" hidden>
+              <small>排序方式</small>
+              <button data-recent-sort="recent"><i>✓</i>最近编辑</button>
+              <button data-recent-sort="name"><i></i>文档名称</button>
+              <hr />
+              <small>显示数量</small>
+              <div class="recent-limit" role="group" aria-label="最近编辑显示数量">
+                <button data-recent-limit="5">5</button>
+                <button data-recent-limit="10">10</button>
+                <button data-recent-limit="20">20</button>
+                <button data-recent-limit="all">全部</button>
+              </div>
+              <hr />
+              <button id="cleanMissingDocuments"><span>⌁</span>清理已不存在的文件</button>
+              <button id="clearRecentDocuments" class="danger"><span>×</span>清空最近编辑记录</button>
+              <p>只整理 Mochi MD 中的记录，不会删除磁盘文件。</p>
+            </div>
+          </div>
+          <div class="document-list" id="documentList"></div>
+
+          <div class="sidebar-footer">
+            <button class="theme-launcher" id="themeLauncher">
+              <span class="palette-dot"></span>
+              <span><strong>淡紫莓果</strong><small>更换阅读主题</small></span>
+              <b>⌄</b>
+            </button>
+          </div>
+        </aside>
+
+        <section class="main-panel">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <button class="icon-button menu-button" id="openSidebar" aria-label="打开侧栏">☰</button>
+              <input id="titleInput" class="title-input" value="关于慢慢生活的练习" aria-label="文档标题" />
+              <button class="favorite" id="favorite" aria-label="收藏文档">♡</button>
+            </div>
+            <div class="toolbar-actions">
+              <div class="view-switcher" role="group" aria-label="视图方式">
+                <button data-mode="edit">编辑</button>
+                <button data-mode="split" class="active">分屏</button>
+                <button data-mode="preview">预览</button>
+              </div>
+              <button class="save-button" id="saveButton" title="保存文档"><span>保存</span><kbd>⌘S</kbd></button>
+              <div class="export-control">
+                <button class="export-button" id="exportButton" title="导出文档" aria-label="导出文档" aria-expanded="false" aria-controls="exportPopover"><span>导出</span><b>⌄</b></button>
+                <div class="export-popover" id="exportPopover" hidden>
+                  <button id="toolbarExportPdf"><span>▣</span><b>导出为 PDF…</b><kbd>⌘⇧P</kbd></button>
+                  <button id="toolbarSaveAs"><span>＋</span><b>另存为 Markdown…</b><kbd>⌘⇧S</kbd></button>
+                </div>
+              </div>
+              <button class="icon-button" id="focusButton" title="专注模式">⛶</button>
+            </div>
+          </div>
+
+          <div class="editor-area mode-split" id="editorArea">
+            <section class="editor-pane">
+              <div class="pane-label"><span>MARKDOWN</span><span id="cursorPosition">第 1 行，第 1 列</span></div>
+              <textarea id="markdownEditor" spellcheck="false" aria-label="Markdown 编辑器"></textarea>
+            </section>
+            <div class="divider" aria-hidden="true"></div>
+            <section class="preview-pane">
+              <div class="pane-label"><span>PREVIEW</span><span class="reading-time" id="readingTime">约 1 分钟阅读</span></div>
+              <article class="markdown-body" id="preview"></article>
+            </section>
+          </div>
+
+          <footer class="statusbar">
+            <div><span id="wordCount">0 字</span><span id="lineCount">0 行</span><span>Markdown</span><button class="file-location unsaved" id="fileLocationButton" title="尚未保存到磁盘" aria-label="文件位置：尚未保存到磁盘" aria-expanded="false" aria-controls="filePopover"><i>⌁</i><span id="fileLocationLabel">尚未保存到磁盘</span><b>⌃</b></button></div>
+            <div><span>UTF-8</span><span class="manual-save" id="manualSaveState"><i></i>按 ⌘S 保存</span></div>
+          </footer>
+        </section>
+      </div>
+    </main>
+
+    <div class="theme-popover" id="themePopover" hidden>
+      <div class="popover-title"><strong>选择你的阅读心情</strong><span>主题会即时应用</span></div>
+      <div class="theme-grid" id="themeGrid"></div>
+    </div>
+
+    <div class="file-popover" id="filePopover" hidden>
+      <div class="file-popover-path"><small>当前文件</small><strong id="fullFilePath">尚未保存到磁盘</strong></div>
+      <button id="revealFile" disabled><span>↗</span>在访达中显示</button>
+      <button id="copyFilePath" disabled><span>⌘</span>复制文件路径</button>
+      <button id="saveAsFile"><span>＋</span>另存为… <kbd>⌘⇧S</kbd></button>
+      <button id="exportPdf"><span>▣</span>按当前样式导出 PDF… <kbd>⌘⇧P</kbd></button>
+    </div>
+
+    <div class="document-context-menu" id="documentContextMenu" hidden>
+      <button id="contextFavorite"><span>♡</span><b>收藏文档</b></button>
+      <button id="contextReveal"><span>↗</span><b>在访达中显示</b></button>
+      <hr />
+      <button id="contextRemove" class="danger"><span>×</span><b>从最近编辑中移除</b></button>
+    </div>
+
+    <div class="toast" id="toast" role="status"></div>
+    <input type="file" id="fileInput" accept=".md,.markdown,.txt" hidden />
+    <input type="file" id="avatarInput" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+    <script src="./app.js"></script>
+  </body>
+</html>

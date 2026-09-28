@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>zh_CN</string>
+  <key>CFBundleDisplayName</key><string>Mochi MD</string>
+  <key>CFBundleExecutable</key><string>MochiMD</string>
+  <key>CFBundleIdentifier</key><string>com.mochimd.desktop</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>Mochi MD</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>0.4.0</string>
+  <key>CFBundleVersion</key><string>15</string>
+  <key>CFBundleIconFile</key><string>MochiMD-0.3.5.icns</string>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>Markdown 文档</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>LSHandlerRank</key><string>Owner</string>
+      <key>CFBundleTypeIconFile</key><string>MochiMD-Markdown.icns</string>
+      <key>LSItemContentTypes</key>
+      <array><string>com.mochimd.markdown-document</string></array>
+      <key>CFBundleTypeExtensions</key>
+      <array><string>md</string><string>markdown</string></array>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key><string>纯文本文档</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>LSHandlerRank</key><string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array><string>public.plain-text</string></array>
+      <key>CFBundleTypeExtensions</key>
+      <array><string>txt</string></array>
+    </dict>
+  </array>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key><string>com.mochimd.markdown-document</string>
+      <key>UTTypeDescription</key><string>Mochi MD Markdown 文档</string>
+      <key>UTTypeIconFile</key><string>MochiMD-Markdown.icns</string>
+      <key>UTTypeConformsTo</key>
+      <array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array><string>md</string><string>markdown</string></array>
+        <key>public.mime-type</key><string>text/markdown</string>
+      </dict>
+    </dict>
+  </array>
+  <key>LSMinimumSystemVersion</key><string>11.0</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
+</dict>
+</plist>
