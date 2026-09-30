@@ -74,6 +74,67 @@ function inline(text) {
     .replace(/`([^`]+)`/g,'<code>$1</code>');
 }
 
+function tableCells(line) {
+  let value = line.trim();
+  if (value.startsWith('|')) value = value.slice(1);
+  if (value.endsWith('|') && !value.endsWith('\\|')) value = value.slice(0,-1);
+  const cells = [];
+  let cell = '';
+  let escaped = false;
+  for (const char of value) {
+    if (char === '|' && !escaped) { cells.push(cell.trim()); cell = ''; continue; }
+    if (char === '\\' && !escaped) { escaped = true; cell += char; continue; }
+    escaped = false;
+    cell += char;
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+function tableDelimiter(cells) {
+  return cells.length > 0 && cells.every(cell => /^:?-{3,}:?$/.test(cell.trim()));
+}
+
+function renderTable(lines, start) {
+  if (start + 1 >= lines.length || !lines[start].includes('|')) return null;
+  const headers = tableCells(lines[start]);
+  const delimiters = tableCells(lines[start + 1]);
+  if (headers.length < 1 || headers.length !== delimiters.length || !tableDelimiter(delimiters)) return null;
+
+  const alignments = delimiters.map(cell => {
+    const value = cell.trim();
+    if (value.startsWith(':') && value.endsWith(':')) return 'center';
+    if (value.startsWith(':')) return 'left';
+    if (value.endsWith(':')) return 'right';
+    return '';
+  });
+  let end = start + 2;
+  const rows = [];
+  while (end < lines.length && lines[end].trim() && lines[end].includes('|')) {
+    rows.push(tableCells(lines[end]));
+    end += 1;
+  }
+  let html = '<table><thead><tr>';
+  headers.forEach((cell, index) => {
+    const align = alignments[index] ? ` style="text-align:${alignments[index]}"` : '';
+    html += `<th${align}>${inline(cell)}</th>`;
+  });
+  html += '</tr></thead>';
+  if (rows.length) {
+    html += '<tbody>';
+    rows.forEach(row => {
+      html += '<tr>';
+      headers.forEach((_, index) => {
+        const align = alignments[index] ? ` style="text-align:${alignments[index]}"` : '';
+        html += `<td${align}>${inline(row[index] || '')}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody>';
+  }
+  return { html: `${html}</table>`, next: end };
+}
+
 function renderMarkdown(md) {
   const lines = md.split('\n');
   let html = '', inCode = false, inList = false, inQuote = false;
@@ -81,6 +142,14 @@ function renderMarkdown(md) {
     const line = lines[i];
     if (line.startsWith('```')) { if(inList){html+='</ul>';inList=false} html += inCode ? '</code></pre>' : '<pre><code>'; inCode=!inCode; continue; }
     if (inCode) { html += escapeHtml(line)+'\n'; continue; }
+    const table = renderTable(lines, i);
+    if (table) {
+      if(inList){html+='</ul>';inList=false}
+      if(inQuote){html+='</blockquote>';inQuote=false}
+      html += table.html;
+      i = table.next - 1;
+      continue;
+    }
     if (/^---+$/.test(line.trim())) { html+='<hr>'; continue; }
     const heading=line.match(/^(#{1,3})\s+(.+)/); if(heading){if(inList){html+='</ul>';inList=false}const n=heading[1].length;html+=`<h${n}>${inline(heading[2])}</h${n}>`;continue}
     if (line.startsWith('> ')) { if(!inQuote){html+='<blockquote>';inQuote=true}html+=`<p>${inline(line.slice(2))}</p>`;continue; } else if(inQuote){html+='</blockquote>';inQuote=false}
