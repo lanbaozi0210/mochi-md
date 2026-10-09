@@ -192,7 +192,10 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
     else if ([command isEqualToString:@"export_pdf"]) [self exportPDF:requestID args:args];
     else if ([command isEqualToString:@"set_represented_path"]) {
         NSString *path = [args[@"path"] isKindOfClass:[NSString class]] ? args[@"path"] : nil;
-        self.window.representedURL = path.length ? [NSURL fileURLWithPath:path] : nil;
+        // Avoid the native document proxy icon: when Launch Services has not
+        // refreshed the Markdown UTI, macOS can render it as a blank page.
+        // Mochi shows the actual path in its own status-bar location control.
+        self.window.representedURL = nil;
         [self settle:requestID result:@YES error:nil];
     }
     else if ([command isEqualToString:@"reveal_in_finder"]) {
