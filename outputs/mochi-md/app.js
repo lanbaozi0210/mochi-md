@@ -60,6 +60,36 @@ const editor = $('#markdownEditor');
 const preview = $('#preview');
 const titleInput = $('#titleInput');
 const editorArea = $('#editorArea');
+const splitDivider = $('#splitDivider');
+const appShell = $('.app-shell');
+const readerButton = $('#focusButton');
+
+let splitRatio = (()=>{
+  const value=Number(localStorage.getItem('mochi-split-ratio'));
+  return Number.isFinite(value)&&value>=25&&value<=75?value:50;
+})();
+function applySplitRatio(value,persist=true){
+  splitRatio=Math.max(25,Math.min(75,Number(value)||50));
+  editorArea.style.setProperty('--split-ratio',`${splitRatio}%`);
+  if(persist)localStorage.setItem('mochi-split-ratio',String(splitRatio));
+}
+applySplitRatio(splitRatio,false);
+
+function setReaderMode(enabled){
+  appShell.classList.toggle('reader-mode',enabled);
+  readerButton.setAttribute('aria-pressed',String(enabled));
+  readerButton.textContent=enabled?'退出阅读者模式':'阅读者模式';
+  readerButton.title=enabled?'退出阅读者模式（Esc）':'阅读者模式';
+  if(enabled)showToast('已进入阅读者模式，可按 ⌘ + 滚轮缩放');
+}
+
+function setReaderScale(value,notify=true){
+  const scale=Math.max(.8,Math.min(1.5,Number(value)||1));
+  appShell.style.setProperty('--reader-scale',scale.toFixed(2));
+  localStorage.setItem('mochi-reader-scale',scale.toFixed(2));
+  if(notify)showToast(`阅读字号 ${Math.round(scale*100)}%`);
+}
+setReaderScale(Number(localStorage.getItem('mochi-reader-scale'))||1,false);
 
 function escapeHtml(text='') {
   return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -442,8 +472,39 @@ $('#contextFavorite').addEventListener('click',()=>{const doc=documents.find(ite
 $('#contextReveal').addEventListener('click',async()=>{const doc=documents.find(item=>item.id===contextDocumentId);if(!doc?.filePath)return;closeDocumentContextMenu();try{await nativeInvoke('reveal_in_finder',{path:doc.filePath})}catch(error){showToast('无法在访达中显示')}});
 $('#contextRemove').addEventListener('click',()=>removeDocumentFromRecent(contextDocumentId));
 document.querySelectorAll('.view-switcher button').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.view-switcher button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');editorArea.className=`editor-area mode-${btn.dataset.mode}`}));
-$('#focusButton').addEventListener('click',()=>{$('.app-shell').classList.toggle('focus');showToast($('.app-shell').classList.contains('focus')?'已进入专注模式':'已退出专注模式')});
-$('#openSidebar').addEventListener('click',()=>$('#sidebar').classList.add('open'));$('#closeSidebar').addEventListener('click',()=>$('#sidebar').classList.remove('open'));
+readerButton.addEventListener('click',()=>setReaderMode(!appShell.classList.contains('reader-mode')));
+$('#collapseSidebar').addEventListener('click',()=>{appShell.classList.add('sidebar-collapsed');showToast('侧边栏已收起')});
+$('#openSidebar').addEventListener('click',()=>{appShell.classList.remove('sidebar-collapsed');$('#sidebar').classList.add('open')});
+$('#closeSidebar').addEventListener('click',()=>$('#sidebar').classList.remove('open'));
+
+splitDivider.addEventListener('pointerdown',event=>{
+  if(!editorArea.classList.contains('mode-split'))return;
+  splitDivider.classList.add('dragging');splitDivider.setPointerCapture(event.pointerId);event.preventDefault();
+});
+splitDivider.addEventListener('pointermove',event=>{
+  if(!splitDivider.hasPointerCapture(event.pointerId))return;
+  const rect=editorArea.getBoundingClientRect();
+  applySplitRatio((event.clientX-rect.left)/rect.width*100);
+});
+function endSplitDrag(event){
+  if(splitDivider.hasPointerCapture(event.pointerId))splitDivider.releasePointerCapture(event.pointerId);
+  splitDivider.classList.remove('dragging');
+}
+splitDivider.addEventListener('pointerup',endSplitDrag);splitDivider.addEventListener('pointercancel',endSplitDrag);
+splitDivider.addEventListener('keydown',event=>{
+  if(!editorArea.classList.contains('mode-split'))return;
+  if(event.key==='ArrowLeft'||event.key==='ArrowRight'){
+    event.preventDefault();applySplitRatio(splitRatio+(event.key==='ArrowRight'?2:-2));
+  }
+  if(event.key==='Home'){event.preventDefault();applySplitRatio(25)}
+  if(event.key==='End'){event.preventDefault();applySplitRatio(75)}
+});
+document.addEventListener('wheel',event=>{
+  if(!appShell.classList.contains('reader-mode')||!event.metaKey)return;
+  event.preventDefault();
+  const current=Number(getComputedStyle(appShell).getPropertyValue('--reader-scale'))||1;
+  setReaderScale(current+(event.deltaY<0?.05:-.05));
+},{passive:false});
 
 $('#saveButton').addEventListener('click',()=>saveCurrent());
 function closeExportPopover(){const popover=$('#exportPopover'),button=$('#exportButton');popover.hidden=true;button.setAttribute('aria-expanded','false')}
@@ -508,7 +569,7 @@ setTheme(localStorage.getItem('mochi-theme')||'lavender');
 $('#themeLauncher').addEventListener('click',e=>{e.stopPropagation();$('#themePopover').hidden=!$('#themePopover').hidden});
 themeGrid.addEventListener('click',e=>{const btn=e.target.closest('.theme-option');if(btn){setTheme(btn.dataset.theme);$('#themePopover').hidden=true;showToast(`已换成${themes.find(t=>t.id===btn.dataset.theme).name}主题`)}});
 document.addEventListener('click',e=>{if(!e.target.closest('#themePopover')&&!e.target.closest('#themeLauncher'))$('#themePopover').hidden=true;if(!e.target.closest('#filePopover')&&!e.target.closest('#fileLocationButton'))closeFilePopover();if(!e.target.closest('#exportPopover')&&!e.target.closest('#exportButton'))closeExportPopover();if(!e.target.closest('#recentMenu')&&!e.target.closest('#recentMenuButton'))closeRecentMenu();if(!e.target.closest('#documentContextMenu'))closeDocumentContextMenu();if(!e.target.closest('#profilePopover')&&!e.target.closest('#profileCopy'))closeProfilePopover()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeRecentMenu();closeDocumentContextMenu();closeProfilePopover();closeExportPopover()}if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='n'){e.preventDefault();newDocument()}if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveCurrent(e.shiftKey)}if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==='p'){e.preventDefault();exportPdf()}if(e.key==='Tab'&&document.activeElement===editor){e.preventDefault();const s=editor.selectionStart;editor.setRangeText('  ',s,editor.selectionEnd,'end');updatePreview();updateWorkingCopy()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(appShell.classList.contains('reader-mode'))setReaderMode(false);closeRecentMenu();closeDocumentContextMenu();closeProfilePopover();closeExportPopover()}if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='n'){e.preventDefault();newDocument()}if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveCurrent(e.shiftKey)}if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==='p'){e.preventDefault();exportPdf()}if(e.key==='Tab'&&document.activeElement===editor){e.preventDefault();const s=editor.selectionStart;editor.setRangeText('  ',s,editor.selectionEnd,'end');updatePreview();updateWorkingCopy()}});
 
 window.mochiSaveBeforeClose=async()=>{if(await saveCurrent())await nativeInvoke('force_close',{});else await nativeInvoke('cancel_quit',{})};
 

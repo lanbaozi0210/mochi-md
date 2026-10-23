@@ -34,6 +34,7 @@
                 <i>✎</i>
               </button>
             </div>
+            <button class="icon-button collapse-sidebar" id="collapseSidebar" aria-label="收起侧边栏" title="收起侧边栏">‹</button>
             <button class="icon-button mobile-close" id="closeSidebar" aria-label="关闭侧栏">×</button>
           </div>
 
@@ -105,7 +106,7 @@
                   <button id="toolbarSaveAs"><span>＋</span><b>另存为 Markdown…</b><kbd>⌘⇧S</kbd></button>
                 </div>
               </div>
-              <button class="icon-button" id="focusButton" title="专注模式">⛶</button>
+              <button class="reader-button" id="focusButton" title="阅读者模式" aria-pressed="false">阅读者模式</button>
             </div>
           </div>
 
@@ -114,7 +115,7 @@
               <div class="pane-label"><span>MARKDOWN</span><span id="cursorPosition">第 1 行，第 1 列</span></div>
               <textarea id="markdownEditor" spellcheck="false" aria-label="Markdown 编辑器"></textarea>
             </section>
-            <div class="divider" aria-hidden="true"></div>
+            <div class="divider" id="splitDivider" role="separator" aria-label="调整编辑区和预览区宽度" aria-orientation="vertical" tabindex="0"></div>
             <section class="preview-pane">
               <div class="pane-label"><span>PREVIEW</span><span class="reading-time" id="readingTime">约 1 分钟阅读</span></div>
               <article class="markdown-body" id="preview"></article>
