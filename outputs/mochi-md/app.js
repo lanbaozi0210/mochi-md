@@ -503,7 +503,7 @@ document.addEventListener('wheel',event=>{
   if(!appShell.classList.contains('reader-mode')||!event.metaKey)return;
   event.preventDefault();
   const current=Number(getComputedStyle(appShell).getPropertyValue('--reader-scale'))||1;
-  setReaderScale(current+(event.deltaY<0?.05:-.05));
+  setReaderScale(current+(event.deltaY<0?-.05:.05));
 },{passive:false});
 
 $('#saveButton').addEventListener('click',()=>saveCurrent());
