@@ -2,7 +2,7 @@
 
 Mochi MD 是一个给自己使用的 macOS Markdown 阅读与编辑器。它把 Markdown 源码编辑、实时预览和个人主题放在同一个轻量窗口里，并保留文档的真实文件路径。
 
-当前版本：**0.4.8**
+当前版本：**0.5.0**
 
 ## 下载
 
@@ -34,15 +34,16 @@ Mochi MD 是一个给自己使用的 macOS Markdown 阅读与编辑器。它把 
 - `work/mochi-md-native/`：macOS 原生壳、文件选择、保存、PDF 导出和文件关联
 - `scripts/build-macos.sh`：本地构建脚本
 - `.github/workflows/release-macos.yml`：推送版本标签后自动构建 GitHub Release
+- `RELEASE_NOTES.md`：当前版本的 GitHub 发布说明
 
 ## 发布新版本
 
-修改版本号后提交代码，再创建并推送版本标签：
+修改版本号与 `RELEASE_NOTES.md` 后提交代码，再创建并推送版本标签：
 
 ```bash
-git add .
-git commit -m "Release v0.4.1"
-git tag v0.4.1
+git add -u
+git commit -m "Release v0.5.0"
+git tag v0.5.0
 git push origin main --tags
 ```
 
