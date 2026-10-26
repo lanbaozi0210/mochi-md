@@ -52,10 +52,10 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
     self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1280, MOCHI_INITIAL_HEIGHT) styleMask:style backing:NSBackingStoreBuffered defer:NO];
     self.window.title = @"Mochi MD";
     self.window.titleVisibility = NSWindowTitleVisible;
-    self.window.titlebarAppearsTransparent = YES;
+    self.window.titlebarAppearsTransparent = NO;
     self.window.movableByWindowBackground = NO;
     self.window.minSize = NSMakeSize(860, 480);
-    self.window.backgroundColor = [NSColor colorWithRed:.94 green:.93 blue:.97 alpha:1];
+    self.window.backgroundColor = [NSColor windowBackgroundColor];
     self.window.contentView = self.webView;
     self.window.delegate = self;
     [self.window center];
