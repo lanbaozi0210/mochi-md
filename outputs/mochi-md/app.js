@@ -41,8 +41,11 @@ let documents = JSON.parse(localStorage.getItem('mochi-documents') || 'null') ||
   { id:3,title:'周末去哪里散步',content:'# 周末去哪里散步\n\n想去有树、有风，也能喝到好咖啡的地方。',updated:'3 天前',favorite:false }
 ];
 const migrationTime=Date.now();
-documents=documents.map((doc,index)=>({...doc,lastOpenedAt:Number(doc.lastOpenedAt)||migrationTime-index}));
-if(!documents.length)documents=[{id:Date.now(),title:'未命名文档',content:'',updated:'新文档',favorite:false,lastOpenedAt:Date.now()}];
+documents=documents.map((doc,index)=>{
+  const lastOpenedAt=Number(doc.lastOpenedAt)||migrationTime-index;
+  return {...doc,lastOpenedAt,lastEditedAt:Number(doc.lastEditedAt)||lastOpenedAt};
+});
+if(!documents.length)documents=[{id:Date.now(),title:'未命名文档',content:'',updated:'新文档',favorite:false,lastOpenedAt:Date.now(),lastEditedAt:Date.now()}];
 let activeId = Number(localStorage.getItem('mochi-active')) || documents[0].id;
 if(!documents.some(doc=>doc.id===activeId))activeId=documents[0].id;
 let fileHandle = null;
@@ -274,7 +277,7 @@ function updateWorkingCopy(){
 
 function renderList(){
   let visibleDocuments=documentFilter==='favorites'?documents.filter(doc=>doc.favorite):documents.filter(doc=>!doc.hiddenFromRecent);
-  visibleDocuments=[...visibleDocuments].sort((a,b)=>recentPreferences.sort==='name'?(a.title||'').localeCompare(b.title||'','zh-CN'):(Number(b.lastOpenedAt)||0)-(Number(a.lastOpenedAt)||0));
+  visibleDocuments=[...visibleDocuments].sort((a,b)=>recentPreferences.sort==='name'?(a.title||'').localeCompare(b.title||'','zh-CN'):(Number(b.lastEditedAt)||0)-(Number(a.lastEditedAt)||0));
   const totalVisible=visibleDocuments.length;
   if(documentFilter==='all'&&recentPreferences.limit!=='all')visibleDocuments=visibleDocuments.slice(0,recentPreferences.limit);
   const emptyTitle=documentFilter==='favorites'?'还没有收藏文档':'最近编辑已整理干净';
@@ -299,9 +302,13 @@ function setDocumentFilter(filter){
 async function loadDoc(id,skipPrompt=false,markRecent=true){
   if(!skipPrompt&&id===activeId)return;
   if(!skipPrompt&&!(await resolveUnsaved()))return;
+  const selectedCard=!skipPrompt?document.querySelector(`.doc-card[data-id="${id}"]`):null;
   activeId=id; const doc=currentDoc();if(markRecent){doc.hiddenFromRecent=false;doc.lastOpenedAt=Date.now()}editor.value=doc.content;titleInput.value=doc.title;fileHandle=doc.filePath||null;updateFileLocation();
   baselineContent=doc.content;baselineTitle=doc.title;setDirty(false);
-  $('#favorite').classList.toggle('active',doc.favorite); updatePreview();renderList();persist();
+  $('#favorite').classList.toggle('active',doc.favorite); updatePreview();
+  if(selectedCard)document.querySelectorAll('.doc-card').forEach(card=>card.classList.toggle('active',card===selectedCard));
+  else renderList();
+  persist();
   $('#sidebar').classList.remove('open');
 }
 
@@ -323,7 +330,7 @@ async function saveCurrent(forceSaveAs=false){
     }else{
       const blob=new Blob([editor.value],{type:'text/markdown'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name+'.md';a.click();URL.revokeObjectURL(a.href);
     }
-    const doc=currentDoc();doc.content=editor.value;doc.title=name;doc.updated='刚刚';doc.lastOpenedAt=Date.now();doc.hiddenFromRecent=false;if(typeof fileHandle==='string')doc.filePath=fileHandle;
+    const doc=currentDoc();doc.content=editor.value;doc.title=name;doc.updated='刚刚';if(isDirty||forceSaveAs)doc.lastEditedAt=Date.now();doc.hiddenFromRecent=false;if(typeof fileHandle==='string')doc.filePath=fileHandle;
     baselineContent=doc.content;baselineTitle=doc.title;setDirty(false);updateFileLocation();persist();renderList();showToast('文档已保存');return true;
   }catch(error){showToast('保存失败');return false}
 }
@@ -344,7 +351,7 @@ async function resolveUnsaved(){
 
 async function newDocument(){
   if(!(await resolveUnsaved()))return;
-  setDocumentFilter('all');const id=Date.now();documents.unshift({id,title:'未命名文档',content:'',updated:'新文档',favorite:false,lastOpenedAt:Date.now()});activeId=id;await loadDoc(id,true);titleInput.select();showToast('新文档已创建');
+  setDocumentFilter('all');const id=Date.now();documents.unshift({id,title:'未命名文档',content:'',updated:'新文档',favorite:false,lastOpenedAt:Date.now(),lastEditedAt:Date.now()});activeId=id;await loadDoc(id,true);titleInput.select();showToast('新文档已创建');
 }
 
 async function confirmAction(title,message,confirmLabel='继续'){
@@ -375,10 +382,10 @@ function openDocumentContextMenu(event,id){
   menu.style.top=`${Math.max(padding,Math.min(event.clientY,window.innerHeight-height-padding))}px`;
 }
 
-function makeBlankDocument(){return {id:Date.now(),title:'未命名文档',content:'',updated:'新文档',favorite:false,lastOpenedAt:Date.now()}}
+function makeBlankDocument(){return {id:Date.now(),title:'未命名文档',content:'',updated:'新文档',favorite:false,lastOpenedAt:Date.now(),lastEditedAt:Date.now()}}
 async function settleAfterRecordRemoval(removedActive){
   if(!documents.length)documents=[makeBlankDocument()];
-  if(removedActive){activeId=[...documents].sort((a,b)=>(Number(b.lastOpenedAt)||0)-(Number(a.lastOpenedAt)||0))[0].id;await loadDoc(activeId,true)}
+  if(removedActive){activeId=[...documents].sort((a,b)=>(Number(b.lastEditedAt)||0)-(Number(a.lastEditedAt)||0))[0].id;await loadDoc(activeId,true)}
   else{persist();renderList()}
 }
 
@@ -527,8 +534,8 @@ async function importContent(name,content,path=null){
   setDocumentFilter('all');
   const nativePath=path||(typeof fileHandle==='string'?fileHandle:null);
   const existing=nativePath&&documents.find(doc=>doc.filePath===nativePath);
-  if(existing){existing.title=name.replace(/\.(md|markdown|txt)$/i,'');existing.content=content;existing.updated='刚刚';existing.lastOpenedAt=Date.now();existing.hiddenFromRecent=false;documents=documents.filter(doc=>doc!==existing);documents.unshift(existing);activeId=existing.id}
-  else{const id=Date.now()+Math.floor(Math.random()*1000);documents.unshift({id,title:name.replace(/\.(md|markdown|txt)$/i,''),content,updated:'刚刚',favorite:false,filePath:nativePath||undefined,lastOpenedAt:Date.now()});activeId=id}
+  if(existing){existing.title=name.replace(/\.(md|markdown|txt)$/i,'');existing.content=content;existing.updated='刚刚';existing.lastOpenedAt=Date.now();existing.hiddenFromRecent=false;activeId=existing.id}
+  else{const id=Date.now()+Math.floor(Math.random()*1000);documents.unshift({id,title:name.replace(/\.(md|markdown|txt)$/i,''),content,updated:'刚刚',favorite:false,filePath:nativePath||undefined,lastOpenedAt:Date.now(),lastEditedAt:Date.now()});activeId=id}
   fileHandle=nativePath||fileHandle;await loadDoc(activeId,true);persist();
 }
 
