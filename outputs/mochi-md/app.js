@@ -34,6 +34,9 @@ const themes = [
   { id:'minimal', name:'极简 Ins', colors:['#171715','#aaa9a2','#fbfbf8'] },
   { id:'coder', name:'程序员', colors:['#7bdcb5','#35425a','#171b23'] }
 ];
+const customThemeDefaults={name:'我的海盐',bg:'#d9d6cf',panel:'#f9f6ec',sidebar:'#ebe8db',text:'#343b40',muted:'#777e82',accent:'#5b7292',accentSoft:'#f2e6ba',paper:'#fffaf0',code:'#f4eed9'};
+let customThemes=(()=>{try{const value=JSON.parse(localStorage.getItem('mochi-custom-themes')||'[]');return Array.isArray(value)?value.filter(theme=>theme&&theme.id&&theme.vars):[]}catch(error){return []}})();
+const customVariableNames=['--bg','--shell','--panel','--sidebar','--text','--muted','--line','--accent','--accent-soft','--accent-ink','--paper','--code','--shadow'];
 
 let documents = JSON.parse(localStorage.getItem('mochi-documents') || 'null') || [
   { id:1,title:'关于慢慢生活的练习',content:sample,updated:'刚刚',favorite:true },
@@ -257,6 +260,8 @@ function renderMarkdown(md) {
 function buildPdfExportHtml(){
   const theme=document.documentElement.dataset.theme||'lavender';
   const title=titleInput.value.trim()||'未命名文档';
+  const customTheme=customThemes.find(item=>item.id===theme);
+  const customCss=customTheme?`html[data-theme="${escapeHtml(theme)}"]{${Object.entries(customTheme.vars).map(([name,value])=>`${name}:${escapeHtml(value)};`).join('')}}`:'';
   return `<!doctype html>
 <html lang="zh-CN" data-theme="${escapeHtml(theme)}">
 <head>
@@ -270,6 +275,7 @@ html[data-theme="ballpoint"]{--text:#35445b;--muted:#7b8794;--line:rgba(91,111,1
 html[data-theme="doodle"]{--text:#242522;--muted:#686a63;--line:rgba(36,37,34,.42);--accent:#00e51b;--accent-soft:#d7ffd6;--accent-ink:#234d27;--paper:#f8f5eb;--code:#e8e8dc}
 html[data-theme="minimal"]{--text:#1c1c1a;--muted:#92928c;--line:rgba(0,0,0,.1);--accent:#171715;--accent-soft:#e8e8e3;--accent-ink:#111;--paper:#fff;--code:#f2f2ef}
 html[data-theme="coder"]{--text:#d9e0ea;--muted:#8e9bad;--line:rgba(201,214,232,.12);--accent:#7bdcb5;--accent-soft:#203b35;--accent-ink:#89e8c1;--paper:#191e27;--code:#11161d}
+${customCss}
 *{box-sizing:border-box}html,body{margin:0;width:794px;height:auto;background:var(--paper);color:var(--text)}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}#pdfSource .markdown-body{padding:72px 66px 80px}.markdown-body>*{max-width:none;margin-left:auto;margin-right:auto}.markdown-body h1,.markdown-body h2,.markdown-body h3{font-family:var(--serif);line-height:1.3;color:var(--text);break-after:avoid-page}.markdown-body h1{font-size:28pt;margin:0 0 16pt;letter-spacing:-.03em}.markdown-body h2{font-size:18pt;margin:30pt 0 11pt}.markdown-body h3{font-size:14pt;margin:21pt 0 8pt}.markdown-body p,.markdown-body li{font-family:var(--serif);font-size:11.5pt;line-height:1.9;color:var(--text)}.markdown-body .lead{font-size:12.5pt;color:var(--muted);margin-bottom:25pt}.markdown-body hr{border:0;border-top:1px solid var(--line);margin:27pt auto}.markdown-body blockquote{display:block;width:100%;margin:22pt 0;padding:14pt 17pt;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;break-inside:avoid-page}.markdown-body blockquote p{margin:0;color:var(--accent-ink)}.markdown-body code{font-family:var(--mono);font-size:.86em;background:var(--code);padding:2px 5px;border-radius:4px;color:var(--accent-ink)}.markdown-body pre{background:var(--code);padding:16pt;border-radius:9px;overflow-wrap:anywhere;white-space:pre-wrap;break-inside:avoid-page}.markdown-body pre code{padding:0;background:none;color:var(--text);line-height:1.6}.markdown-body a{color:var(--accent-ink);text-decoration-color:var(--accent);text-underline-offset:3px}.markdown-body ul{padding-left:20pt}.markdown-body li::marker{color:var(--accent)}.markdown-body input[type=checkbox]{accent-color:var(--accent)}.markdown-body img{max-width:100%;height:auto;border-radius:10px;break-inside:avoid-page}.markdown-body table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:10pt;break-inside:avoid-page}.markdown-body th,.markdown-body td{border:1px solid var(--line);padding:8pt;text-align:left}.markdown-body th{background:var(--accent-soft)}html[data-theme="coder"] .markdown-body,html[data-theme="coder"] .markdown-body p,html[data-theme="coder"] .markdown-body li{font-family:var(--mono)}
 html[data-theme="butter-sea"] .markdown-body blockquote{background:#f8efce;border-left-color:#8093ad}html[data-theme="butter-sea"] .markdown-body th{background:#f5e9bb}
 html[data-theme="ballpoint"] .markdown-body h1,html[data-theme="ballpoint"] .markdown-body h2,html[data-theme="ballpoint"] .markdown-body h3{font-family:"SFMono-Regular",Menlo,"PingFang SC",sans-serif;font-weight:500;color:var(--accent-ink);letter-spacing:0}html[data-theme="ballpoint"] .markdown-body th,html[data-theme="ballpoint"] .markdown-body td{border-style:dashed}html[data-theme="ballpoint"] .markdown-body blockquote{border-left-style:dashed}
@@ -650,19 +656,53 @@ dropList.addEventListener('drop',async event=>{
 document.addEventListener('dragover',event=>{if(containsFiles(event))event.preventDefault()});
 document.addEventListener('drop',event=>{if(containsFiles(event)&&!event.target.closest('#documentList'))event.preventDefault()});
 
-const themeGrid=$('#themeGrid');
-themeGrid.innerHTML=themes.map(t=>`<button class="theme-option" data-theme="${t.id}"><span class="theme-swatch">${t.colors.map(c=>`<i style="background:${c}"></i>`).join('')}</span><span>${t.name}</span></button>`).join('');
+const themeGrid=$('#themeGrid'),themeManager=$('#themeManager'),themeEditor=$('#themeEditor');
+function allThemes(){return [...themes,...customThemes.map(theme=>({id:theme.id,name:theme.name,colors:[theme.vars['--accent'],theme.vars['--accent-soft'],theme.vars['--bg']]}))]}
+function persistCustomThemes(){localStorage.setItem('mochi-custom-themes',JSON.stringify(customThemes))}
+function renderThemeGrid(){
+  themeGrid.innerHTML=allThemes().map(t=>`<button class="theme-option" data-theme="${escapeHtml(t.id)}"><span class="theme-swatch">${t.colors.map(c=>`<i style="background:${escapeHtml(c)}"></i>`).join('')}</span><span>${escapeHtml(t.name)}</span></button>`).join('');
+  document.querySelectorAll('.theme-option').forEach(b=>b.classList.toggle('active',b.dataset.theme===document.documentElement.dataset.theme));
+}
+function clearCustomVariables(){customVariableNames.forEach(name=>document.documentElement.style.removeProperty(name))}
 function setTheme(id){
   const migrated={chocolate:'butter-sea',strawberry:'doodle',pixel:'ballpoint'}[id]||id;
-  const theme=themes.find(t=>t.id===migrated)||themes.find(t=>t.id==='lavender');
+  const theme=allThemes().find(t=>t.id===migrated)||themes.find(t=>t.id==='lavender');
+  clearCustomVariables();
+  if(theme.id.startsWith('custom-')){
+    const custom=customThemes.find(item=>item.id===theme.id);
+    if(custom)Object.entries(custom.vars).forEach(([name,value])=>document.documentElement.style.setProperty(name,value));
+  }
   document.documentElement.dataset.theme=theme.id;
   localStorage.setItem('mochi-theme',theme.id);
   $('.theme-launcher strong').textContent=theme.name;
-  document.querySelectorAll('.theme-option').forEach(b=>b.classList.toggle('active',b.dataset.theme===theme.id));
+  renderThemeGrid();
 }
+function openThemeEditor(theme=null){
+  const source=theme?theme.vars:customThemeDefaults;
+  $('#themeEditorTitle').textContent=theme?'编辑主题':'新建主题';
+  $('#customThemeName').value=theme?theme.name:customThemeDefaults.name;
+  Object.entries({bg:'--bg',panel:'--panel',sidebar:'--sidebar',text:'--text',muted:'--muted',accent:'--accent',accentSoft:'--accent-soft',paper:'--paper',code:'--code'}).forEach(([id,name])=>{$(`#customTheme${id[0].toUpperCase()+id.slice(1)}`).value=source[name]||customThemeDefaults[id]});
+  themeEditor.dataset.editingId=theme?.id||'';themeManager.hidden=true;themeEditor.hidden=false;setTimeout(()=>$('#customThemeName').focus(),0);
+}
+function closeThemeEditor(){themeEditor.hidden=true;themeEditor.dataset.editingId=''}
+function renderCustomThemeManager(){
+  $('#customThemeList').innerHTML=customThemes.length?customThemes.map(theme=>`<div class="custom-theme-row"><span class="theme-swatch">${[theme.vars['--accent'],theme.vars['--accent-soft'],theme.vars['--bg']].map(c=>`<i style="background:${escapeHtml(c)}"></i>`).join('')}</span><strong>${escapeHtml(theme.name)}</strong><button data-edit-custom="${escapeHtml(theme.id)}">编辑</button><button data-delete-custom="${escapeHtml(theme.id)}">删除</button></div>`).join(''):'<p class="theme-manager-empty">还没有自定义主题</p>';
+}
+renderThemeGrid();
 setTheme(localStorage.getItem('mochi-theme')||'lavender');
 $('#themeLauncher').addEventListener('click',e=>{e.stopPropagation();$('#themePopover').hidden=!$('#themePopover').hidden});
-themeGrid.addEventListener('click',e=>{const btn=e.target.closest('.theme-option');if(btn){setTheme(btn.dataset.theme);$('#themePopover').hidden=true;showToast(`已换成${themes.find(t=>t.id===btn.dataset.theme).name}主题`)}});
+themeGrid.addEventListener('click',e=>{const btn=e.target.closest('.theme-option');if(btn){setTheme(btn.dataset.theme);showToast(`已换成${allThemes().find(t=>t.id===btn.dataset.theme).name}主题`)}});
+$('#newThemeButton').addEventListener('click',()=>openThemeEditor());
+$('#manageThemesButton').addEventListener('click',()=>{renderCustomThemeManager();themeEditor.hidden=true;themeManager.hidden=false});
+$('#closeThemeManager').addEventListener('click',()=>{themeManager.hidden=true});
+$('#cancelThemeEditor').addEventListener('click',closeThemeEditor);
+$('#saveCustomTheme').addEventListener('click',()=>{
+  const name=$('#customThemeName').value.trim();if(!name){showToast('请先填写主题名称');$('#customThemeName').focus();return}
+  const values={};Object.entries({bg:'--bg',panel:'--panel',sidebar:'--sidebar',text:'--text',muted:'--muted',accent:'--accent',accentSoft:'--accent-soft',paper:'--paper',code:'--code'}).forEach(([id,varName])=>values[varName]=$(`#customTheme${id[0].toUpperCase()+id.slice(1)}`).value);
+  values['--shell']=values['--panel'];values['--accent-ink']=values['--text'];values['--line']='color-mix(in srgb,var(--text) 18%,transparent)';values['--shadow']='0 24px 60px color-mix(in srgb,var(--text) 16%,transparent)';
+  const editingId=themeEditor.dataset.editingId;const id=editingId||`custom-${Date.now()}`;const record={id,name,vars:values};const index=customThemes.findIndex(theme=>theme.id===id);if(index>=0)customThemes[index]=record;else customThemes.push(record);persistCustomThemes();renderThemeGrid();setTheme(id);closeThemeEditor();$('#themePopover').hidden=false;showToast(editingId?'主题已更新':'主题已保存');
+});
+$('#customThemeList').addEventListener('click',event=>{const edit=event.target.closest('[data-edit-custom]'),remove=event.target.closest('[data-delete-custom]');if(edit){openThemeEditor(customThemes.find(theme=>theme.id===edit.dataset.editCustom));return}if(remove){const index=customThemes.findIndex(theme=>theme.id===remove.dataset.deleteCustom);if(index<0)return;const name=customThemes[index].name;if(!window.confirm(`删除自定义主题“${name}”？`))return;const id=customThemes[index].id;customThemes.splice(index,1);persistCustomThemes();renderThemeGrid();if(document.documentElement.dataset.theme===id)setTheme('butter-sea');renderCustomThemeManager();showToast('主题已删除')}});
 document.addEventListener('click',e=>{if(!e.target.closest('#themePopover')&&!e.target.closest('#themeLauncher'))$('#themePopover').hidden=true;if(!e.target.closest('#filePopover')&&!e.target.closest('#fileLocationButton'))closeFilePopover();if(!e.target.closest('#exportPopover')&&!e.target.closest('#exportButton'))closeExportPopover();if(!e.target.closest('#recentMenu')&&!e.target.closest('#recentMenuButton'))closeRecentMenu();if(!e.target.closest('#documentContextMenu'))closeDocumentContextMenu();if(!e.target.closest('#profilePopover')&&!e.target.closest('#profileCopy'))closeProfilePopover()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(appShell.classList.contains('reader-mode'))setReaderMode(false);closeRecentMenu();closeDocumentContextMenu();closeProfilePopover();closeExportPopover()}if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='n'){e.preventDefault();newDocument()}if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveCurrent(e.shiftKey)}if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==='p'){e.preventDefault();exportPdf()}if(e.key==='Tab'&&document.activeElement===editor){e.preventDefault();const s=editor.selectionStart;editor.setRangeText('  ',s,editor.selectionEnd,'end');updatePreview();updateWorkingCopy()}});
 
