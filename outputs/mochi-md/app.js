@@ -66,6 +66,11 @@ const editorArea = $('#editorArea');
 const splitDivider = $('#splitDivider');
 const appShell = $('.app-shell');
 const readerButton = $('#focusButton');
+const syncButton = $('#syncButton');
+let syncEnabled = localStorage.getItem('mochi-sync-position') === 'true';
+let syncFrame = 0;
+let syncLockUntil = 0;
+let syncTarget = null;
 
 let splitRatio = (()=>{
   const value=Number(localStorage.getItem('mochi-split-ratio'));
@@ -97,6 +102,59 @@ setReaderScale(Number(localStorage.getItem('mochi-reader-scale'))||1,false);
 function escapeHtml(text='') {
   return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+function clearSyncHighlight(){
+  preview.querySelectorAll('.sync-target,.sync-hover').forEach(node=>node.classList.remove('sync-target','sync-hover'));
+  syncTarget=null;
+}
+function setSyncHighlight(node,temporary=false){
+  if(!node)return;
+  if(syncTarget&&syncTarget!==node)syncTarget.classList.remove('sync-target','sync-hover');
+  node.classList.add(temporary?'sync-hover':'sync-target');
+  syncTarget=node;
+}
+function sourceLineRange(node){return {start:Number(node?.dataset.sourceStart)||0,end:Number(node?.dataset.sourceEnd)||Number(node?.dataset.sourceStart)||0}}
+function lineStartOffset(line){return editor.value.split('\n').slice(0,line).reduce((sum,value)=>sum+value.length+1,0)}
+function lineFromCaret(){return editor.value.slice(0,editor.selectionStart).split('\n').length-1}
+function nearestSourceNode(line){
+  const nodes=[...preview.querySelectorAll('[data-source-start]')];
+  if(!nodes.length)return null;
+  return nodes.reduce((best,node)=>{const range=sourceLineRange(node);const distance=line<range.start?range.start-line:line>range.end?line-range.end:0;return !best||distance<best.distance?{node,distance}:best},{node:null,distance:Infinity}).node;
+}
+function highlightSourceLine(line,scrollIntoView=false){
+  if(!syncEnabled)return;
+  const node=nearestSourceNode(Math.max(0,line));
+  if(!node)return;
+  setSyncHighlight(node);
+  if(scrollIntoView)node.scrollIntoView({block:'center',behavior:'smooth'});
+}
+function syncPreviewToEditor(){
+  if(!syncEnabled||performance.now()<syncLockUntil)return;
+  const max=editor.scrollHeight-editor.clientHeight;
+  const ratio=max>0?editor.scrollTop/max:0;
+  const previewMax=preview.scrollHeight-preview.clientHeight;
+  syncLockUntil=performance.now()+100;
+  preview.scrollTop=previewMax>0?ratio*previewMax:0;
+  highlightSourceLine(lineFromCaret());
+}
+function syncEditorToPreview(){
+  if(!syncEnabled||performance.now()<syncLockUntil)return;
+  const max=preview.scrollHeight-preview.clientHeight;
+  const ratio=max>0?preview.scrollTop/max:0;
+  const editorMax=editor.scrollHeight-editor.clientHeight;
+  syncLockUntil=performance.now()+100;
+  editor.scrollTop=editorMax>0?ratio*editorMax:0;
+  const nodes=[...preview.querySelectorAll('[data-source-start]')];
+  const visible=nodes.find(node=>node.getBoundingClientRect().bottom>preview.getBoundingClientRect().top+45)||nodes[0];
+  setSyncHighlight(visible);
+}
+function setSyncEnabled(enabled,notify=true){
+  syncEnabled=Boolean(enabled);localStorage.setItem('mochi-sync-position',String(syncEnabled));
+  syncButton.setAttribute('aria-pressed',String(syncEnabled));syncButton.title=syncEnabled?'关闭两侧联动定位':'开启两侧联动定位';
+  if(!syncEnabled)clearSyncHighlight();
+  else {highlightSourceLine(lineFromCaret());if(notify)showToast('已开启联动定位')}
+}
+setSyncEnabled(syncEnabled,false);
 
 function inline(text) {
   return escapeHtml(text)
@@ -165,15 +223,17 @@ function renderTable(lines, start) {
     });
     html += '</tbody>';
   }
-  return { html: `${html}</table>`, next: end };
+  return { html: `<table data-source-start="${start}" data-source-end="${Math.max(start,end-1)}">${html.slice('<table>'.length)}</table>`, next: end };
 }
+
+function sourceMarker(start,end=start){return ` data-source-start="${start}" data-source-end="${Math.max(start,end)}"`}
 
 function renderMarkdown(md) {
   const lines = md.split('\n');
   let html = '', inCode = false, inList = false, inQuote = false;
   for (let i=0;i<lines.length;i++) {
     const line = lines[i];
-    if (line.startsWith('```')) { if(inList){html+='</ul>';inList=false} html += inCode ? '</code></pre>' : '<pre><code>'; inCode=!inCode; continue; }
+    if (line.startsWith('```')) { if(inList){html+='</ul>';inList=false} html += inCode ? '</code></pre>' : `<pre${sourceMarker(i)}><code>`; inCode=!inCode; continue; }
     if (inCode) { html += escapeHtml(line)+'\n'; continue; }
     const table = renderTable(lines, i);
     if (table) {
@@ -184,11 +244,11 @@ function renderMarkdown(md) {
       continue;
     }
     if (/^---+$/.test(line.trim())) { html+='<hr>'; continue; }
-    const heading=line.match(/^(#{1,3})\s+(.+)/); if(heading){if(inList){html+='</ul>';inList=false}const n=heading[1].length;html+=`<h${n}>${inline(heading[2])}</h${n}>`;continue}
-    if (line.startsWith('> ')) { if(!inQuote){html+='<blockquote>';inQuote=true}html+=`<p>${inline(line.slice(2))}</p>`;continue; } else if(inQuote){html+='</blockquote>';inQuote=false}
-    const item=line.match(/^[-*]\s+(.+)/); if(item){if(!inList){html+='<ul>';inList=true}const task=item[1].match(/^\[([ xX])\]\s+(.+)/);html+=task?`<li><input type="checkbox" disabled ${task[1].toLowerCase()==='x'?'checked':''}> ${inline(task[2])}</li>`:`<li>${inline(item[1])}</li>`;continue}else if(inList){html+='</ul>';inList=false}
+    const heading=line.match(/^(#{1,3})\s+(.+)/); if(heading){if(inList){html+='</ul>';inList=false}const n=heading[1].length;html+=`<h${n}${sourceMarker(i)}>${inline(heading[2])}</h${n}>`;continue}
+    if (line.startsWith('> ')) { if(!inQuote){html+=`<blockquote${sourceMarker(i)}>`;inQuote=true}html+=`<p${sourceMarker(i)}>${inline(line.slice(2))}</p>`;continue; } else if(inQuote){html+='</blockquote>';inQuote=false}
+    const item=line.match(/^[-*]\s+(.+)/); if(item){if(!inList){html+=`<ul${sourceMarker(i)}>`;inList=true}const task=item[1].match(/^\[([ xX])\]\s+(.+)/);html+=task?`<li${sourceMarker(i)}><input type="checkbox" disabled ${task[1].toLowerCase()==='x'?'checked':''}> ${inline(task[2])}</li>`:`<li${sourceMarker(i)}>${inline(item[1])}</li>`;continue}else if(inList){html+='</ul>';inList=false}
     if (!line.trim()) continue;
-    html += `<p${html===''?' class="lead"':''}>${inline(line)}</p>`;
+    html += `<p${html===''?' class="lead"':''}${sourceMarker(i)}>${inline(line)}</p>`;
   }
   if(inList)html+='</ul>'; if(inQuote)html+='</blockquote>'; if(inCode)html+='</code></pre>';
   return html;
@@ -320,6 +380,16 @@ function updatePreview(){
   preview.innerHTML=renderMarkdown(editor.value);
   const chars=editor.value.replace(/\s/g,'').length, lines=editor.value.split('\n').length;
   $('#wordCount').textContent=`${chars} 字`;$('#lineCount').textContent=`${lines} 行`;$('#readingTime').textContent=`约 ${Math.max(1,Math.ceil(chars/450))} 分钟阅读`;
+  if(syncEnabled)highlightSourceLine(lineFromCaret());
+}
+
+function jumpToSource(node){
+  if(!syncEnabled||!node)return;
+  const range=sourceLineRange(node),start=lineStartOffset(range.start),end=Math.max(start,lineStartOffset(range.end)+editor.value.split('\n')[range.end]?.length||start);
+  editor.focus();editor.setSelectionRange(start,Math.min(editor.value.length,end));
+  const lineHeight=parseFloat(getComputedStyle(editor).lineHeight)||22;
+  editor.scrollTop=Math.max(0,range.start*lineHeight-editor.clientHeight*.35);
+  updateCursor();highlightSourceLine(range.start);showToast(`已定位到第 ${range.start+1} 行`);
 }
 
 async function saveCurrent(forceSaveAs=false){
@@ -465,8 +535,15 @@ $('#saveProfileText').addEventListener('click',saveProfileText);
 $('#resetProfileText').addEventListener('click',()=>{$('#deskNameInput').value=defaultProfileText.name;$('#deskSubtitleInput').value=defaultProfileText.subtitle;$('#deskNameInput').focus()});
 [$('#deskNameInput'),$('#deskSubtitleInput')].forEach(input=>input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();saveProfileText()}}));
 
-editor.addEventListener('input',()=>{updatePreview();updateWorkingCopy()});
-editor.addEventListener('click',updateCursor);editor.addEventListener('keyup',updateCursor);
+editor.addEventListener('input',()=>{updatePreview();updateWorkingCopy();if(syncEnabled)highlightSourceLine(lineFromCaret())});
+editor.addEventListener('click',()=>{updateCursor();highlightSourceLine(lineFromCaret())});
+editor.addEventListener('keyup',()=>{updateCursor();highlightSourceLine(lineFromCaret())});
+editor.addEventListener('scroll',()=>{if(syncEnabled){cancelAnimationFrame(syncFrame);syncFrame=requestAnimationFrame(syncPreviewToEditor)}});
+preview.addEventListener('click',event=>{const node=event.target.closest('[data-source-start]');if(node)jumpToSource(node)});
+preview.addEventListener('mouseover',event=>{if(!syncEnabled)return;const node=event.target.closest('[data-source-start]');if(node)setSyncHighlight(node,true)});
+preview.addEventListener('mouseleave',()=>{if(syncEnabled&&syncTarget)syncTarget.classList.remove('sync-hover')});
+preview.addEventListener('scroll',()=>{if(syncEnabled){cancelAnimationFrame(syncFrame);syncFrame=requestAnimationFrame(syncEditorToPreview)}});
+syncButton.addEventListener('click',()=>setSyncEnabled(!syncEnabled));
 function updateCursor(){const before=editor.value.slice(0,editor.selectionStart).split('\n');$('#cursorPosition').textContent=`第 ${before.length} 行，第 ${before.at(-1).length+1} 列`}
 titleInput.addEventListener('input',updateWorkingCopy);
 $('#newDoc').addEventListener('click',newDocument);
