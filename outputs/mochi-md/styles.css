@@ -77,6 +77,7 @@ html[data-theme="ballpoint"] .markdown-body blockquote{border-left-style:solid}
 /* Stable favorite control and safer custom-theme actions. */
 .favorite{display:inline-grid;place-items:center;width:28px;height:28px;padding:0;border:0;background:none;color:var(--accent);font-size:0;line-height:1}
 .favorite::before{content:"♡";font-size:20px;line-height:1;transform:translateY(-1px);transition:transform .16s ease}
+.favorite::after{content:none!important}
 .favorite.active::before{content:"♥";font-size:18px;transform:translateY(-1px) scale(1.02)}
 .markdown-body .task-checkbox{cursor:pointer;pointer-events:auto}
 .custom-theme-row .danger-button{border-color:transparent;color:var(--muted);opacity:.58}
