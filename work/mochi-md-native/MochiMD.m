@@ -25,6 +25,7 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
 @property(copy) NSString *documentTitle;
 @property(assign) BOOL webReady;
 @property(strong) NSMutableArray<NSDictionary *> *pendingOpenDocuments;
+@property(strong) NSColorPanel *colorPanel;
 @end
 
 @implementation MochiAppDelegate
@@ -233,6 +234,7 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
     else if ([command isEqualToString:@"confirm_unsaved"]) [self confirmUnsaved:requestID title:args[@"title"]];
     else if ([command isEqualToString:@"confirm_action"]) [self confirmAction:requestID args:args];
     else if ([command isEqualToString:@"choose_avatar"]) [self chooseAvatar:requestID];
+    else if ([command isEqualToString:@"choose_color"]) [self chooseColor:requestID args:args];
     else if ([command isEqualToString:@"force_close"]) {
         self.quitRequested = YES;
         self.forceClosing = YES;
@@ -245,6 +247,40 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
         [self settle:requestID result:@YES error:nil];
     }
     else [self settle:requestID result:nil error:@"Unknown native command"];
+}
+
+- (void)chooseColor:(NSString *)requestID args:(NSDictionary *)args {
+    NSColorPanel *panel = self.colorPanel ?: [NSColorPanel sharedColorPanel];
+    self.colorPanel = panel;
+    panel.showsAlpha = NO;
+    panel.continuous = YES;
+    panel.target = self;
+    panel.action = @selector(colorPanelChanged:);
+    NSString *hex = [args[@"color"] isKindOfClass:[NSString class]] ? args[@"color"] : @"#ffffff";
+    unsigned value = 0;
+    NSScanner *scanner = [NSScanner scannerWithString:[hex stringByReplacingOccurrencesOfString:@"#" withString:@""]];
+    [scanner scanHexInt:&value];
+    panel.color = [NSColor colorWithCalibratedRed:((value >> 16) & 0xff) / 255.0 green:((value >> 8) & 0xff) / 255.0 blue:(value & 0xff) / 255.0 alpha:1.0];
+    CGFloat x = [args[@"screenX"] doubleValue], y = [args[@"screenY"] doubleValue];
+    NSPoint point = NSMakePoint(x, y);
+    NSScreen *screen = [NSScreen mainScreen];
+    for (NSScreen *candidate in NSScreen.screens) if (NSPointInRect(point, candidate.frame)) { screen = candidate; break; }
+    NSRect frame = panel.frame;
+    CGFloat originY = NSMaxY(screen.frame) - y - frame.size.height;
+    if (originY < NSMinY(screen.frame) + 12) originY = NSMinY(screen.frame) + 12;
+    if (x + frame.size.width > NSMaxX(screen.frame)) x = NSMaxX(screen.frame) - frame.size.width - 12;
+    [panel setFrameOrigin:NSMakePoint(MAX(NSMinX(screen.frame) + 12, x), originY)];
+    [panel makeKeyAndOrderFront:nil];
+    [self settle:requestID result:@YES error:nil];
+}
+
+- (void)colorPanelChanged:(id)sender {
+    NSColor *color = [self.colorPanel.color colorUsingColorSpace:[NSColorSpace sRGBColorSpace]];
+    if (!color) return;
+    NSString *hex = [NSString stringWithFormat:@"#%02lX%02lX%02lX", (long)lrint(color.redComponent * 255.0), (long)lrint(color.greenComponent * 255.0), (long)lrint(color.blueComponent * 255.0)];
+    NSData *data = [NSJSONSerialization dataWithJSONObject:hex options:0 error:nil];
+    NSString *encoded = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    [self.webView evaluateJavaScript:[NSString stringWithFormat:@"window.mochiSetNativeColor(%@)", encoded] completionHandler:nil];
 }
 
 - (void)confirmAction:(NSString *)requestID args:(NSDictionary *)args {

@@ -249,7 +249,7 @@ function renderMarkdown(md) {
     if (/^---+$/.test(line.trim())) { html+='<hr>'; continue; }
     const heading=line.match(/^(#{1,3})\s+(.+)/); if(heading){if(inList){html+='</ul>';inList=false}const n=heading[1].length;html+=`<h${n}${sourceMarker(i)}>${inline(heading[2])}</h${n}>`;continue}
     if (line.startsWith('> ')) { if(!inQuote){html+=`<blockquote${sourceMarker(i)}>`;inQuote=true}html+=`<p${sourceMarker(i)}>${inline(line.slice(2))}</p>`;continue; } else if(inQuote){html+='</blockquote>';inQuote=false}
-    const item=line.match(/^[-*]\s+(.+)/); if(item){if(!inList){html+=`<ul${sourceMarker(i)}>`;inList=true}const task=item[1].match(/^\[([ xX])\]\s+(.+)/);html+=task?`<li${sourceMarker(i)}><input type="checkbox" disabled ${task[1].toLowerCase()==='x'?'checked':''}> ${inline(task[2])}</li>`:`<li${sourceMarker(i)}>${inline(item[1])}</li>`;continue}else if(inList){html+='</ul>';inList=false}
+    const item=line.match(/^[-*]\s+(.+)/); if(item){if(!inList){html+=`<ul${sourceMarker(i)}>`;inList=true}const task=item[1].match(/^\[([ xX])\]\s+(.+)/);html+=task?`<li${sourceMarker(i)}><input class="task-checkbox" type="checkbox" data-source-line="${i}" ${task[1].toLowerCase()==='x'?'checked':''}> ${inline(task[2])}</li>`:`<li${sourceMarker(i)}>${inline(item[1])}</li>`;continue}else if(inList){html+='</ul>';inList=false}
     if (!line.trim()) continue;
     html += `<p${html===''?' class="lead"':''}${sourceMarker(i)}>${inline(line)}</p>`;
   }
@@ -375,7 +375,7 @@ async function loadDoc(id,skipPrompt=false,markRecent=true){
   const selectedCard=!skipPrompt?document.querySelector(`.doc-card[data-id="${id}"]`):null;
   activeId=id; const doc=currentDoc();if(markRecent){doc.hiddenFromRecent=false;doc.lastOpenedAt=Date.now()}editor.value=doc.content;titleInput.value=doc.title;fileHandle=doc.filePath||null;updateFileLocation();
   baselineContent=doc.content;baselineTitle=doc.title;setDirty(false);
-  $('#favorite').classList.toggle('active',doc.favorite); updatePreview();
+  $('#favorite').classList.toggle('active',doc.favorite);$('#favorite').setAttribute('aria-pressed',String(doc.favorite)); updatePreview();
   if(selectedCard)document.querySelectorAll('.doc-card').forEach(card=>card.classList.toggle('active',card===selectedCard));
   else renderList();
   persist();
@@ -545,7 +545,8 @@ editor.addEventListener('input',()=>{updatePreview();updateWorkingCopy();if(sync
 editor.addEventListener('click',()=>{updateCursor();highlightSourceLine(lineFromCaret())});
 editor.addEventListener('keyup',()=>{updateCursor();highlightSourceLine(lineFromCaret())});
 editor.addEventListener('scroll',()=>{if(syncEnabled){cancelAnimationFrame(syncFrame);syncFrame=requestAnimationFrame(syncPreviewToEditor)}});
-preview.addEventListener('click',event=>{const node=event.target.closest('[data-source-start]');if(node)jumpToSource(node)});
+preview.addEventListener('click',event=>{if(event.target.closest('.task-checkbox'))return;const node=event.target.closest('[data-source-start]');if(node)jumpToSource(node)});
+preview.addEventListener('change',event=>{const checkbox=event.target.closest('.task-checkbox');if(!checkbox)return;const line=Number(checkbox.dataset.sourceLine),lines=editor.value.split('\n');if(!Number.isInteger(line)||!lines[line])return;lines[line]=lines[line].replace(/^(\s*[-*]\s+)\[([ xX])\](\s+)/,`$1[${checkbox.checked?'x':' '}]$3`);const caret=editor.selectionStart;editor.value=lines.join('\n');updatePreview();updateWorkingCopy();editor.focus();editor.setSelectionRange(Math.min(caret,editor.value.length),Math.min(caret,editor.value.length));if(syncEnabled)highlightSourceLine(line)});
 preview.addEventListener('mouseover',event=>{if(!syncEnabled)return;const node=event.target.closest('[data-source-start]');if(node)setSyncHighlight(node,true)});
 preview.addEventListener('mouseleave',()=>{if(syncEnabled&&syncTarget)syncTarget.classList.remove('sync-hover')});
 preview.addEventListener('scroll',()=>{if(syncEnabled){cancelAnimationFrame(syncFrame);syncFrame=requestAnimationFrame(syncEditorToPreview)}});
@@ -553,7 +554,7 @@ syncButton.addEventListener('click',()=>setSyncEnabled(!syncEnabled));
 function updateCursor(){const before=editor.value.slice(0,editor.selectionStart).split('\n');$('#cursorPosition').textContent=`第 ${before.length} 行，第 ${before.at(-1).length+1} 列`}
 titleInput.addEventListener('input',updateWorkingCopy);
 $('#newDoc').addEventListener('click',newDocument);
-$('#favorite').addEventListener('click',()=>{const doc=currentDoc();doc.favorite=!doc.favorite;$('#favorite').classList.toggle('active',doc.favorite);persist();renderList()});
+$('#favorite').addEventListener('click',()=>{const doc=currentDoc();doc.favorite=!doc.favorite;const button=$('#favorite');button.classList.toggle('active',doc.favorite);button.setAttribute('aria-pressed',String(doc.favorite));persist();renderList()});
 document.querySelectorAll('[data-document-filter]').forEach(button=>button.addEventListener('click',()=>setDocumentFilter(button.dataset.documentFilter)));
 $('#recentMenuButton').addEventListener('click',toggleRecentMenu);
 $('#recentMenu').addEventListener('click',event=>event.stopPropagation());
@@ -686,8 +687,15 @@ function openThemeEditor(theme=null){
 }
 function closeThemeEditor(){themeEditor.hidden=true;themeEditor.dataset.editingId=''}
 function renderCustomThemeManager(){
-  $('#customThemeList').innerHTML=customThemes.length?customThemes.map(theme=>`<div class="custom-theme-row"><span class="theme-swatch">${[theme.vars['--accent'],theme.vars['--accent-soft'],theme.vars['--bg']].map(c=>`<i style="background:${escapeHtml(c)}"></i>`).join('')}</span><strong>${escapeHtml(theme.name)}</strong><button data-edit-custom="${escapeHtml(theme.id)}">编辑</button><button data-delete-custom="${escapeHtml(theme.id)}">删除</button></div>`).join(''):'<p class="theme-manager-empty">还没有自定义主题</p>';
+  $('#customThemeList').innerHTML=customThemes.length?customThemes.map(theme=>`<div class="custom-theme-row"><span class="theme-swatch">${[theme.vars['--accent'],theme.vars['--accent-soft'],theme.vars['--bg']].map(c=>`<i style="background:${escapeHtml(c)}"></i>`).join('')}</span><strong>${escapeHtml(theme.name)}</strong><button data-edit-custom="${escapeHtml(theme.id)}">编辑</button><button class="danger-button" data-delete-custom="${escapeHtml(theme.id)}">删除</button></div>`).join(''):'<p class="theme-manager-empty">还没有自定义主题</p>';
 }
+let activeNativeColorInput=null;
+window.mochiSetNativeColor=function(hex){if(!activeNativeColorInput)return;activeNativeColorInput.value=hex;activeNativeColorInput.dispatchEvent(new Event('input',{bubbles:true}));activeNativeColorInput.dispatchEvent(new Event('change',{bubbles:true}))};
+document.querySelectorAll('.theme-editor input[type="color"]').forEach(input=>input.addEventListener('pointerdown',event=>{
+  if(!hasNativeBridge)return;
+  event.preventDefault();activeNativeColorInput=input;
+  nativeInvoke('choose_color',{color:input.value,screenX:event.screenX,screenY:event.screenY}).catch(()=>{});
+}));
 renderThemeGrid();
 setTheme(localStorage.getItem('mochi-theme')||'lavender');
 $('#themeLauncher').addEventListener('click',e=>{e.stopPropagation();$('#themePopover').hidden=!$('#themePopover').hidden});
