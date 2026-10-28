@@ -278,8 +278,7 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
     NSColor *color = [self.colorPanel.color colorUsingColorSpace:[NSColorSpace sRGBColorSpace]];
     if (!color) return;
     NSString *hex = [NSString stringWithFormat:@"#%02lX%02lX%02lX", (long)lrint(color.redComponent * 255.0), (long)lrint(color.greenComponent * 255.0), (long)lrint(color.blueComponent * 255.0)];
-    NSData *data = [NSJSONSerialization dataWithJSONObject:hex options:0 error:nil];
-    NSString *encoded = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    NSString *encoded = [NSString stringWithFormat:@"\"%@\"", hex];
     [self.webView evaluateJavaScript:[NSString stringWithFormat:@"window.mochiSetNativeColor(%@)", encoded] completionHandler:nil];
 }
 
