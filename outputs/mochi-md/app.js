@@ -696,6 +696,10 @@ document.querySelectorAll('.theme-editor input[type="color"]').forEach(input=>in
   event.preventDefault();activeNativeColorInput=input;
   nativeInvoke('choose_color',{color:input.value,screenX:event.screenX,screenY:event.screenY}).catch(()=>{});
 }));
+document.querySelectorAll('.theme-editor input[type="color"]').forEach(input=>input.addEventListener('click',event=>{
+  if(!hasNativeBridge)return;
+  event.preventDefault();event.stopPropagation();
+}));
 renderThemeGrid();
 setTheme(localStorage.getItem('mochi-theme')||'lavender');
 $('#themeLauncher').addEventListener('click',e=>{e.stopPropagation();$('#themePopover').hidden=!$('#themePopover').hidden});
