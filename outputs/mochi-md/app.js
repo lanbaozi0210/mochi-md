@@ -661,7 +661,7 @@ const themeGrid=$('#themeGrid'),themeManager=$('#themeManager'),themeEditor=$('#
 function allThemes(){return [...themes,...customThemes.map(theme=>({id:theme.id,name:theme.name,colors:[theme.vars['--accent'],theme.vars['--accent-soft'],theme.vars['--bg']]}))]}
 function persistCustomThemes(){localStorage.setItem('mochi-custom-themes',JSON.stringify(customThemes))}
 function renderThemeGrid(){
-  themeGrid.innerHTML=allThemes().map(t=>`<button class="theme-option" data-theme="${escapeHtml(t.id)}"><span class="theme-swatch">${t.colors.map(c=>`<i style="background:${escapeHtml(c)}"></i>`).join('')}</span><span>${escapeHtml(t.name)}</span></button>`).join('');
+  themeGrid.innerHTML=allThemes().map(t=>{const custom=t.id.startsWith('custom-');return custom?`<div class="theme-option custom-theme-option" data-theme="${escapeHtml(t.id)}" role="button" tabindex="0"><span class="theme-swatch">${t.colors.map(c=>`<i style="background:${escapeHtml(c)}"></i>`).join('')}</span><span class="theme-option-name">${escapeHtml(t.name)}</span><span class="theme-option-actions"><button data-edit-custom="${escapeHtml(t.id)}">编辑</button><button class="danger-button" data-delete-custom="${escapeHtml(t.id)}">删除</button></span></div>`:`<button class="theme-option" data-theme="${escapeHtml(t.id)}"><span class="theme-swatch">${t.colors.map(c=>`<i style="background:${escapeHtml(c)}"></i>`).join('')}</span><span>${escapeHtml(t.name)}</span></button>`}).join('');
   document.querySelectorAll('.theme-option').forEach(b=>b.classList.toggle('active',b.dataset.theme===document.documentElement.dataset.theme));
 }
 function clearCustomVariables(){customVariableNames.forEach(name=>document.documentElement.style.removeProperty(name))}
@@ -679,13 +679,16 @@ function setTheme(id){
   renderThemeGrid();
 }
 function openThemeEditor(theme=null){
+  themeEditor.dataset.previousTheme=document.documentElement.dataset.theme||'lavender';
   const source=theme?theme.vars:customThemeDefaults;
   $('#themeEditorTitle').textContent=theme?'编辑主题':'新建主题';
   $('#customThemeName').value=theme?theme.name:customThemeDefaults.name;
   Object.entries({bg:'--bg',panel:'--panel',sidebar:'--sidebar',text:'--text',muted:'--muted',accent:'--accent',accentSoft:'--accent-soft',paper:'--paper',code:'--code'}).forEach(([id,name])=>{$(`#customTheme${id[0].toUpperCase()+id.slice(1)}`).value=source[name]||customThemeDefaults[id]});
-  themeEditor.dataset.editingId=theme?.id||'';themeManager.hidden=true;themeEditor.hidden=false;setTimeout(()=>$('#customThemeName').focus(),0);
+  themeEditor.dataset.editingId=theme?.id||'';themeManager.hidden=true;themeEditor.hidden=false;applyThemeEditorPreview();setTimeout(()=>$('#customThemeName').focus(),0);
 }
-function closeThemeEditor(){themeEditor.hidden=true;themeEditor.dataset.editingId=''}
+function editorThemeValues(){const values={};Object.entries({bg:'--bg',panel:'--panel',sidebar:'--sidebar',text:'--text',muted:'--muted',accent:'--accent',accentSoft:'--accent-soft',paper:'--paper',code:'--code'}).forEach(([id,varName])=>values[varName]=$(`#customTheme${id[0].toUpperCase()+id.slice(1)}`).value);values['--shell']=values['--panel'];values['--accent-ink']=values['--text'];values['--line']='color-mix(in srgb,var(--text) 18%,transparent)';values['--shadow']='0 24px 60px color-mix(in srgb,var(--text) 16%,transparent)';return values}
+function applyThemeEditorPreview(){const values=editorThemeValues();clearCustomVariables();Object.entries(values).forEach(([name,value])=>document.documentElement.style.setProperty(name,value));document.documentElement.dataset.theme='custom-preview';$('.theme-launcher strong').textContent=$('#customThemeName').value.trim()||'主题预览'}
+function closeThemeEditor(){const previous=themeEditor.dataset.previousTheme||'lavender';themeEditor.hidden=true;themeEditor.dataset.editingId='';themeEditor.dataset.previousTheme='';setTheme(previous)}
 function renderCustomThemeManager(){
   $('#customThemeList').innerHTML=customThemes.length?customThemes.map(theme=>`<div class="custom-theme-row"><span class="theme-swatch">${[theme.vars['--accent'],theme.vars['--accent-soft'],theme.vars['--bg']].map(c=>`<i style="background:${escapeHtml(c)}"></i>`).join('')}</span><strong>${escapeHtml(theme.name)}</strong><button data-edit-custom="${escapeHtml(theme.id)}">编辑</button><button class="danger-button" data-delete-custom="${escapeHtml(theme.id)}">删除</button></div>`).join(''):'<p class="theme-manager-empty">还没有自定义主题</p>';
 }
@@ -703,14 +706,14 @@ document.querySelectorAll('.theme-editor input[type="color"]').forEach(input=>in
 renderThemeGrid();
 setTheme(localStorage.getItem('mochi-theme')||'lavender');
 $('#themeLauncher').addEventListener('click',e=>{e.stopPropagation();$('#themePopover').hidden=!$('#themePopover').hidden});
-themeGrid.addEventListener('click',e=>{const btn=e.target.closest('.theme-option');if(btn){setTheme(btn.dataset.theme);showToast(`已换成${allThemes().find(t=>t.id===btn.dataset.theme).name}主题`)}});
+themeGrid.addEventListener('click',async e=>{const edit=e.target.closest('[data-edit-custom]'),remove=e.target.closest('[data-delete-custom]'),btn=e.target.closest('.theme-option');if(edit){openThemeEditor(customThemes.find(theme=>theme.id===edit.dataset.editCustom));return}if(remove){const index=customThemes.findIndex(theme=>theme.id===remove.dataset.deleteCustom);if(index<0)return;const name=customThemes[index].name;let confirmed=hasNativeBridge?await nativeInvoke('confirm_action',{title:'删除自定义主题？',message:`主题“${name}”删除后无法恢复。`,confirmLabel:'删除'}):window.confirm(`删除自定义主题“${name}”？`);if(!confirmed)return;const id=customThemes[index].id;customThemes.splice(index,1);persistCustomThemes();if(document.documentElement.dataset.theme===id)setTheme('butter-sea');renderThemeGrid();showToast('主题已删除');return}if(btn){setTheme(btn.dataset.theme);showToast(`已换成${allThemes().find(t=>t.id===btn.dataset.theme).name}主题`)}});
+document.querySelectorAll('.theme-editor input[type="color"]').forEach(input=>input.addEventListener('input',applyThemeEditorPreview));
+$('#customThemeName').addEventListener('input',applyThemeEditorPreview);
 $('#newThemeButton').addEventListener('click',()=>openThemeEditor());
-$('#manageThemesButton').addEventListener('click',()=>{renderCustomThemeManager();themeEditor.hidden=true;themeManager.hidden=false});
-$('#closeThemeManager').addEventListener('click',()=>{themeManager.hidden=true});
 $('#cancelThemeEditor').addEventListener('click',closeThemeEditor);
 $('#saveCustomTheme').addEventListener('click',()=>{
   const name=$('#customThemeName').value.trim();if(!name){showToast('请先填写主题名称');$('#customThemeName').focus();return}
-  const values={};Object.entries({bg:'--bg',panel:'--panel',sidebar:'--sidebar',text:'--text',muted:'--muted',accent:'--accent',accentSoft:'--accent-soft',paper:'--paper',code:'--code'}).forEach(([id,varName])=>values[varName]=$(`#customTheme${id[0].toUpperCase()+id.slice(1)}`).value);
+  const values=editorThemeValues();
   values['--shell']=values['--panel'];values['--accent-ink']=values['--text'];values['--line']='color-mix(in srgb,var(--text) 18%,transparent)';values['--shadow']='0 24px 60px color-mix(in srgb,var(--text) 16%,transparent)';
   const editingId=themeEditor.dataset.editingId;const id=editingId||`custom-${Date.now()}`;const record={id,name,vars:values};const index=customThemes.findIndex(theme=>theme.id===id);if(index>=0)customThemes[index]=record;else customThemes.push(record);persistCustomThemes();renderThemeGrid();setTheme(id);closeThemeEditor();$('#themePopover').hidden=false;showToast(editingId?'主题已更新':'主题已保存');
 });

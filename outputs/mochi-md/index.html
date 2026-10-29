@@ -136,14 +136,13 @@
       <div class="theme-grid" id="themeGrid"></div>
       <div class="theme-actions">
         <button id="newThemeButton">＋ 新建主题</button>
-        <button id="manageThemesButton">管理自定义主题</button>
       </div>
       <div class="theme-manager" id="themeManager" hidden>
         <div class="theme-manager-title"><strong>我的自定义主题</strong><button id="closeThemeManager">完成</button></div>
         <div id="customThemeList"></div>
       </div>
       <div class="theme-editor" id="themeEditor" hidden>
-        <div class="theme-editor-title"><strong id="themeEditorTitle">新建主题</strong><button id="cancelThemeEditor">取消</button></div>
+        <div class="theme-editor-title"><strong id="themeEditorTitle">新建主题</strong><span><button id="cancelThemeEditor" class="secondary">取消</button><button id="saveCustomTheme" class="primary">保存</button></span></div>
         <div class="theme-name-field"><label for="customThemeName">主题名称</label><input id="customThemeName" maxlength="18" placeholder="例如：我的海盐" /></div>
         <div class="theme-editor-section"><strong>界面基础</strong><div class="theme-color-grid">
           <label>背景<input id="customThemeBg" type="color" /></label>
@@ -160,7 +159,6 @@
           <label>强调背景<input id="customThemeAccentSoft" type="color" /></label>
           <label>代码块<input id="customThemeCode" type="color" /></label>
         </div></div>
-        <div class="theme-editor-actions"><button id="saveCustomTheme" class="primary">保存主题</button></div>
       </div>
     </div>
 
