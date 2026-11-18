@@ -541,6 +541,35 @@ $('#saveProfileText').addEventListener('click',saveProfileText);
 $('#resetProfileText').addEventListener('click',()=>{$('#deskNameInput').value=defaultProfileText.name;$('#deskSubtitleInput').value=defaultProfileText.subtitle;$('#deskNameInput').focus()});
 [$('#deskNameInput'),$('#deskSubtitleInput')].forEach(input=>input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();saveProfileText()}}));
 
+function listContinuation(text,start,end){
+  if(start!==end)return null;
+  const lineStart=text.lastIndexOf('\n',start-1)+1;
+  const lineEnd=text.indexOf('\n',start);
+  const line=text.slice(lineStart,lineEnd<0?text.length:lineEnd);
+  let fence=null;
+  for(const prior of text.slice(0,lineStart).split('\n')){
+    const match=prior.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if(!match)continue;
+    if(!fence)fence={char:match[1][0],length:match[1].length};
+    else if(match[1][0]===fence.char&&match[1].length>=fence.length&&!match[2].trim())fence=null;
+  }
+  if(fence)return null;
+  const match=line.match(/^(\s*)([-+*]|\d+[.)])([ \t]+)(?:\[([ xX])\]([ \t]+))?/);
+  if(!match||start<lineStart+match[0].length)return null;
+  if(!line.slice(match[0].length).trim())return {start:lineStart,end:lineStart+line.length,text:''};
+  const marker=/^\d/.test(match[2])?`${Number.parseInt(match[2],10)+1}${match[2].slice(-1)}`:match[2];
+  return {start,end,text:`\n${match[1]}${marker}${match[3]}${match[4]!==undefined?'[ ]'+match[5]:''}`};
+}
+editor.addEventListener('keydown',event=>{
+  if(event.key!=='Enter'||event.shiftKey||event.metaKey||event.ctrlKey||event.altKey||event.isComposing)return;
+  const edit=listContinuation(editor.value,editor.selectionStart,editor.selectionEnd);
+  if(!edit)return;
+  event.preventDefault();
+  editor.setSelectionRange(edit.start,edit.end);
+  // Use the native editing command so list continuation remains undoable with Cmd+Z.
+  document.execCommand('insertText',false,edit.text);
+  updatePreview();updateWorkingCopy();updateCursor();
+});
 editor.addEventListener('input',()=>{updatePreview();updateWorkingCopy();if(syncEnabled)highlightSourceLine(lineFromCaret())});
 editor.addEventListener('click',()=>{updateCursor();highlightSourceLine(lineFromCaret())});
 editor.addEventListener('keyup',()=>{updateCursor();highlightSourceLine(lineFromCaret())});
