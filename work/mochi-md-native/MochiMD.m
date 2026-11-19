@@ -59,6 +59,7 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
     self.window.backgroundColor = [NSColor windowBackgroundColor];
     self.window.contentView = self.webView;
     self.window.delegate = self;
+    self.window.releasedWhenClosed = NO;
     [self.window center];
     [self.window makeKeyAndOrderFront:nil];
 
@@ -136,7 +137,13 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
 }
 
 - (void)windowWillClose:(NSNotification *)notification {
-    [[NSApplication sharedApplication] terminate:nil];
+    if (notification.object != self.window) return;
+    [self.colorPanel orderOut:nil];
+    if (self.quitRequested) [[NSApplication sharedApplication] terminate:nil];
+}
+
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
+    return NO;
 }
 
 - (BOOL)windowShouldClose:(NSWindow *)sender {
@@ -235,6 +242,10 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
     else if ([command isEqualToString:@"confirm_action"]) [self confirmAction:requestID args:args];
     else if ([command isEqualToString:@"choose_avatar"]) [self chooseAvatar:requestID];
     else if ([command isEqualToString:@"choose_color"]) [self chooseColor:requestID args:args];
+    else if ([command isEqualToString:@"close_window"]) {
+        [self settle:requestID result:@YES error:nil];
+        [self.window close];
+    }
     else if ([command isEqualToString:@"force_close"]) {
         self.quitRequested = YES;
         self.forceClosing = YES;
@@ -532,6 +543,13 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
     quitItem.target = self;
     appItem.submenu = appMenu;
 
+    NSMenuItem *fileItem = [[NSMenuItem alloc] init];
+    [menu addItem:fileItem];
+    NSMenu *fileMenu = [[NSMenu alloc] initWithTitle:@"文件"];
+    NSMenuItem *closeItem = [fileMenu addItemWithTitle:@"关闭窗口" action:@selector(requestCloseWindow:) keyEquivalent:@"w"];
+    closeItem.target = self;
+    fileItem.submenu = fileMenu;
+
     NSMenuItem *editItem = [[NSMenuItem alloc] init];
     [menu addItem:editItem];
     NSMenu *editMenu = [[NSMenu alloc] initWithTitle:@"编辑"];
@@ -545,6 +563,11 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
     [editMenu addItemWithTitle:@"全选" action:@selector(selectAll:) keyEquivalent:@"a"];
     editItem.submenu = editMenu;
     [NSApplication sharedApplication].mainMenu = menu;
+}
+
+- (void)requestCloseWindow:(id)sender {
+    if (!self.window.isVisible) return;
+    [self.webView evaluateJavaScript:@"window.mochiCloseWindow()" completionHandler:nil];
 }
 
 - (void)requestQuit:(id)sender {
