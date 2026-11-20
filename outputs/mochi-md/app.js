@@ -370,6 +370,7 @@ function setDocumentFilter(filter){
 }
 
 async function loadDoc(id,skipPrompt=false,markRecent=true){
+  if(saveBusy||conflictBusy)return;
   if(!skipPrompt&&id===activeId)return;
   if(!skipPrompt&&!(await resolveUnsaved()))return;
   const selectedCard=!skipPrompt?document.querySelector(`.doc-card[data-id="${id}"]`):null;
@@ -398,11 +399,50 @@ function jumpToSource(node){
   updateCursor();highlightSourceLine(range.start);showToast(`已定位到第 ${range.start+1} 行`);
 }
 
+let externalCheckBusy=false,saveBusy=false,conflictBusy=false;
+let ignoredExternalContent=null;
+function applyExternalContent(content){
+  const top=editor.scrollTop,previewTop=preview.scrollTop,start=editor.selectionStart,end=editor.selectionEnd;
+  editor.value=content;baselineContent=content;currentDoc().content=content;currentDoc().updated='已同步';
+  updateWorkingCopy();updatePreview();persist();
+  editor.setSelectionRange(Math.min(start,content.length),Math.min(end,content.length));editor.scrollTop=top;preview.scrollTop=previewTop;
+  ignoredExternalContent=null;showToast('已同步外部修改');
+}
+async function resolveExternalConflict(){
+  if(conflictBusy)return false;
+  conflictBusy=true;const id=activeId,path=currentFilePath();
+  try{
+    const choice=await nativeInvoke('resolve_file_conflict',{});
+    if(id!==activeId||path!==currentFilePath())return false;
+    if(choice==='reload'){applyExternalContent(await nativeInvoke('read_markdown',{path}));return true}
+    if(choice==='save_as')return await saveCurrent(true);
+    return false;
+  }finally{conflictBusy=false}
+}
+async function checkExternalFile(){
+  const path=currentFilePath();if(!hasNativeBridge||!path||externalCheckBusy||saveBusy||conflictBusy)return;
+  externalCheckBusy=true;const id=activeId;
+  try{
+    const content=await nativeInvoke('read_markdown',{path});
+    if(id!==activeId||path!==currentFilePath()||saveBusy)return;
+    if(content===baselineContent)return;
+    if(!isDirty){applyExternalContent(content);return}
+    if(ignoredExternalContent?.id===id&&ignoredExternalContent.content===content)return;
+    ignoredExternalContent={id,content};await resolveExternalConflict();
+  }catch(error){/* Unavailable files are never overwritten; save reports the error. */}
+  finally{externalCheckBusy=false}
+}
+window.addEventListener('focus',checkExternalFile);
+setInterval(checkExternalFile,2000);
+
 async function saveCurrent(forceSaveAs=false){
+  if(saveBusy||(conflictBusy&&!forceSaveAs))return false;
+  saveBusy=true;
   const name=titleInput.value||'未命名文档';
   try{
     if(hasNativeBridge){
-      const path=await nativeInvoke('save_markdown',{path:forceSaveAs?null:fileHandle,defaultName:name+'.md',content:editor.value});
+      const path=await nativeInvoke('save_markdown',{path:forceSaveAs?null:fileHandle,defaultName:name+'.md',content:editor.value,expectedContent:forceSaveAs?null:baselineContent,protectedPath:forceSaveAs?currentFilePath():null});
+      if(path?.conflict){saveBusy=false;return await resolveExternalConflict()}
       if(!path)return false;
       fileHandle=path;
     }else if(fileHandle&&!forceSaveAs){
@@ -412,7 +452,8 @@ async function saveCurrent(forceSaveAs=false){
     }
     const doc=currentDoc();doc.content=editor.value;doc.title=name;doc.updated='刚刚';if(isDirty||forceSaveAs)doc.lastEditedAt=Date.now();doc.hiddenFromRecent=false;if(typeof fileHandle==='string')doc.filePath=fileHandle;
     baselineContent=doc.content;baselineTitle=doc.title;setDirty(false);updateFileLocation();persist();renderList();showToast('文档已保存');return true;
-  }catch(error){showToast('保存失败');return false}
+  }catch(error){showToast(`保存失败：${error.message||'无法写入文件'}`);return false}
+  finally{saveBusy=false}
 }
 
 function revertCurrent(){

@@ -242,6 +242,22 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
     else if ([command isEqualToString:@"confirm_action"]) [self confirmAction:requestID args:args];
     else if ([command isEqualToString:@"choose_avatar"]) [self chooseAvatar:requestID];
     else if ([command isEqualToString:@"choose_color"]) [self chooseColor:requestID args:args];
+    else if ([command isEqualToString:@"read_markdown"]) {
+        NSString *path = [args[@"path"] isKindOfClass:[NSString class]] ? args[@"path"] : nil;
+        NSError *error = nil;
+        NSString *content = path.length ? [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error] : nil;
+        [self settle:requestID result:content error:content ? nil : (error.localizedDescription ?: @"无法读取文件")];
+    }
+    else if ([command isEqualToString:@"resolve_file_conflict"]) {
+        NSAlert *alert = [[NSAlert alloc] init];
+        alert.messageText = @"文件已在其他应用中修改";
+        alert.informativeText = @"Mochi 中也有未保存的修改。载入外部版本会放弃当前修改；你也可以将当前内容另存为其他文件，或继续编辑。";
+        [alert addButtonWithTitle:@"继续编辑"];
+        [alert addButtonWithTitle:@"将当前内容另存为…"];
+        [alert addButtonWithTitle:@"载入外部版本"];
+        NSModalResponse response = [alert runModal];
+        [self settle:requestID result:response == NSAlertSecondButtonReturn ? @"save_as" : (response == NSAlertThirdButtonReturn ? @"reload" : @"continue") error:nil];
+    }
     else if ([command isEqualToString:@"close_window"]) {
         [self settle:requestID result:@YES error:nil];
         [self.window close];
@@ -391,6 +407,21 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
         destination = panel.URL;
     }
     NSError *error = nil;
+    NSString *expected = [args[@"expectedContent"] isKindOfClass:[NSString class]] ? args[@"expectedContent"] : nil;
+    if (expected && path.length && [destination.path isEqualToString:path]) {
+        NSString *disk = [NSString stringWithContentsOfURL:destination encoding:NSUTF8StringEncoding error:&error];
+        if (!disk) { [self settle:requestID result:nil error:error.localizedDescription ?: @"原文件已不可用，请另存为"]; return; }
+        if (![disk isEqualToString:expected]) {
+            [self settle:requestID result:@{@"conflict":@YES} error:nil];
+            return;
+        }
+    }
+    // Saving a copy must never overwrite the externally changed original.
+    NSString *protectedPath = [args[@"protectedPath"] isKindOfClass:[NSString class]] ? args[@"protectedPath"] : nil;
+    if (protectedPath.length && [destination.path isEqualToString:protectedPath]) {
+        [self settle:requestID result:nil error:@"请为副本选择不同的文件名或位置"];
+        return;
+    }
     [content writeToURL:destination atomically:YES encoding:NSUTF8StringEncoding error:&error];
     if (error) [self settle:requestID result:nil error:error.localizedDescription];
     else [self settle:requestID result:destination.path error:nil];
