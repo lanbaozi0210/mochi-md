@@ -85,6 +85,9 @@ function applySplitRatio(value,persist=true){
   if(persist)localStorage.setItem('mochi-split-ratio',String(splitRatio));
 }
 applySplitRatio(splitRatio,false);
+let previewScale=(()=>{const value=Number(localStorage.getItem('mochi-preview-scale'));return Number.isFinite(value)&&value>=.8&&value<=1.4?value:1})();
+function setPreviewScale(value,notify=true){previewScale=Math.max(.8,Math.min(1.4,Math.round((Number(value)||1)*20)/20));appShell.style.setProperty('--preview-scale',previewScale.toFixed(2));$('#previewFontReset').textContent=`${Math.round(previewScale*100)}%`;localStorage.setItem('mochi-preview-scale',previewScale.toFixed(2));if(notify)showToast(`预览字号 ${Math.round(previewScale*100)}%`)}
+setPreviewScale(previewScale,false);
 
 function setReaderMode(enabled){
   appShell.classList.toggle('reader-mode',enabled);
@@ -672,6 +675,9 @@ document.addEventListener('wheel',event=>{
 },{passive:false});
 
 $('#saveButton').addEventListener('click',()=>saveCurrent());
+$('#previewFontDown').addEventListener('click',()=>setPreviewScale(previewScale-.05));
+$('#previewFontUp').addEventListener('click',()=>setPreviewScale(previewScale+.05));
+$('#previewFontReset').addEventListener('click',()=>setPreviewScale(1));
 function closeExportPopover(){const popover=$('#exportPopover'),button=$('#exportButton');popover.hidden=true;button.setAttribute('aria-expanded','false')}
 function toggleExportPopover(event){event.stopPropagation();const popover=$('#exportPopover'),willOpen=popover.hidden;closeFilePopover();popover.hidden=!willOpen;event.currentTarget.setAttribute('aria-expanded',String(willOpen))}
 $('#exportButton').addEventListener('click',toggleExportPopover);
