@@ -623,7 +623,7 @@ editor.addEventListener('paste',async event=>{
   const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file)});
   let markdown=`![截图](${dataUrl})`;
   if(hasNativeBridge&&currentFilePath()){
-    try{markdown=await nativeInvoke('save_pasted_image',{dataURL,documentPath:currentFilePath()})}catch(error){showToast('图片保存失败');return}
+    try{markdown=await nativeInvoke('save_pasted_image',{dataURL:dataUrl,documentPath:currentFilePath()})}catch(error){showToast(`图片保存失败：${error.message||'无法写入资源文件'}`);return}
   }
   const start=editor.selectionStart,end=editor.selectionEnd;editor.setRangeText(markdown,start,end,'end');updatePreview();updateWorkingCopy();showToast('截图已插入');
 });
