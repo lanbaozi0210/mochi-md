@@ -614,6 +614,19 @@ editor.addEventListener('keydown',event=>{
   document.execCommand('insertText',false,edit.text);
   updatePreview();updateWorkingCopy();updateCursor();
 });
+editor.addEventListener('paste',async event=>{
+  const items=Array.from(event.clipboardData?.items||[]);
+  const imageItem=items.find(item=>item.kind==='file'&&/^image\//.test(item.type));
+  if(!imageItem)return;
+  event.preventDefault();
+  const file=imageItem.getAsFile();if(!file)return;
+  const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file)});
+  let markdown=`![截图](${dataUrl})`;
+  if(hasNativeBridge&&currentFilePath()){
+    try{markdown=await nativeInvoke('save_pasted_image',{dataURL,documentPath:currentFilePath()})}catch(error){showToast('图片保存失败');return}
+  }
+  const start=editor.selectionStart,end=editor.selectionEnd;editor.setRangeText(markdown,start,end,'end');updatePreview();updateWorkingCopy();showToast('截图已插入');
+});
 editor.addEventListener('input',()=>{updatePreview();updateWorkingCopy();if(syncEnabled)highlightSourceLine(lineFromCaret())});
 editor.addEventListener('click',()=>{updateCursor();highlightSourceLine(lineFromCaret())});
 editor.addEventListener('keyup',()=>{updateCursor();highlightSourceLine(lineFromCaret())});

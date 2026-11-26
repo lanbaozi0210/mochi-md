@@ -241,6 +241,7 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
     else if ([command isEqualToString:@"confirm_unsaved"]) [self confirmUnsaved:requestID title:args[@"title"]];
     else if ([command isEqualToString:@"confirm_action"]) [self confirmAction:requestID args:args];
     else if ([command isEqualToString:@"choose_avatar"]) [self chooseAvatar:requestID];
+    else if ([command isEqualToString:@"save_pasted_image"]) [self savePastedImage:requestID args:args];
     else if ([command isEqualToString:@"choose_color"]) [self chooseColor:requestID args:args];
     else if ([command isEqualToString:@"read_markdown"]) {
         NSString *path = [args[@"path"] isKindOfClass:[NSString class]] ? args[@"path"] : nil;
@@ -274,6 +275,22 @@ static BOOL MochiSupportsDocumentURL(NSURL *url) {
         [self settle:requestID result:@YES error:nil];
     }
     else [self settle:requestID result:nil error:@"Unknown native command"];
+}
+
+- (void)savePastedImage:(NSString *)requestID args:(NSDictionary *)args {
+    NSString *dataURL = [args[@"dataURL"] isKindOfClass:[NSString class]] ? args[@"dataURL"] : nil;
+    NSString *documentPath = [args[@"documentPath"] isKindOfClass:[NSString class]] ? args[@"documentPath"] : nil;
+    NSRange comma = [dataURL rangeOfString:@","];
+    if (!dataURL.length || comma.location == NSNotFound || !documentPath.length) { [self settle:requestID result:nil error:@"无法保存截图"]; return; }
+    NSData *data = [[NSData alloc] initWithBase64EncodedString:[dataURL substringFromIndex:comma.location + 1] options:NSDataBase64DecodingIgnoreUnknownCharacters];
+    if (!data.length) { [self settle:requestID result:nil error:@"无法读取截图数据"]; return; }
+    NSString *directory = [[documentPath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"images"];
+    NSError *error = nil;
+    [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:&error];
+    NSString *filename = [NSString stringWithFormat:@"pasted-image-%@.png", @((long long)(NSDate.date.timeIntervalSince1970 * 1000))];
+    NSString *destination = [directory stringByAppendingPathComponent:filename];
+    if (error || ![data writeToFile:destination options:NSDataWritingAtomic error:&error]) { [self settle:requestID result:nil error:error.localizedDescription ?: @"无法保存截图"]; return; }
+    [self settle:requestID result:[NSString stringWithFormat:@"![截图](images/%@)", filename] error:nil];
 }
 
 - (void)chooseColor:(NSString *)requestID args:(NSDictionary *)args {
