@@ -98,8 +98,9 @@ function setReaderMode(enabled){
 }
 
 function setReaderScale(value,notify=true){
-  const scale=Math.max(.8,Math.min(1.5,Number(value)||1));
+  const scale=Math.max(.8,Math.min(2.4,Number(value)||1));
   appShell.style.setProperty('--reader-scale',scale.toFixed(2));
+  preview.style.setProperty('--reader-scale',scale.toFixed(2));
   localStorage.setItem('mochi-reader-scale',scale.toFixed(2));
   if(notify)showToast(`阅读字号 ${Math.round(scale*100)}%`);
 }
@@ -685,7 +686,7 @@ document.addEventListener('wheel',event=>{
   if(!appShell.classList.contains('reader-mode')||!event.metaKey)return;
   event.preventDefault();
   const current=Number(getComputedStyle(appShell).getPropertyValue('--reader-scale'))||1;
-  setReaderScale(current+(event.deltaY<0?-.05:.05));
+  setReaderScale(current+(event.deltaY<0?-.1:.1));
 },{passive:false});
 
 $('#saveButton').addEventListener('click',()=>saveCurrent());
